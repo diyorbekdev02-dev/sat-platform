@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: satplatform-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: satplatform
+    ports:
+      - "5433:5432"
+    volumes:
+      - satplatform-pgdata:/var/lib/postgresql/data
+
+volumes:
+  satplatform-pgdata:

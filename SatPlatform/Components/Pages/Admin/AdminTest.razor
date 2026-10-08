@@ -1,0 +1,207 @@
+@page "/admin/tests/{TestId:int}"
+@attribute [Authorize(Roles = "Admin,SuperAdmin,Teacher")]
+@inherits AppPage
+@inject TestBuilderService Builder
+@inject TestEngineService Engine
+@inject ContentService Content
+@inject ScoringService Scoring
+
+<PageTitle>Test builder</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (t is null) { <div class="empty"><h3>Test topilmadi</h3></div> }
+else
+{
+    <div class="card mb">
+        <div class="row between">
+            <div><div class="row"><h1>@t.Title</h1><span class="badge @(t.Status == TestStatus.Published ? "ok" : t.Status == TestStatus.Draft ? "warn" : "")">@Labels.TestStatus(t.Status)</span><span class="badge accent">@Labels.TestType(t.Type)</span>@if (t.IsAdaptive) { <span class="badge">Adaptiv</span> }</div><div class="small muted mt-s">@t.Description</div></div>
+            <div class="row">
+                <button class="btn" @onclick="PreviewAsync"><Icon Name="eye" /> Preview</button>
+                <button class="btn" @onclick="() => settingsOpen = true"><Icon Name="settings" /> Sozlamalar</button>
+                @if (t.Status == TestStatus.Draft) { <button class="btn primary" @onclick="PublishAsync" disabled="@busy"><Icon Name="check" /> Chop etish</button> }
+                @if (t.Status == TestStatus.Published) { <a class="btn primary" href="/teacher/assign?test=@TestId"><Icon Name="send" /> Tayinlash</a><button class="btn" @onclick="() => SetStatusAsync(TestStatus.Draft)">Qoralamaga qaytarish</button> }
+                @if (t.Status != TestStatus.Archived) { <button class="btn" @onclick="() => SetStatusAsync(TestStatus.Archived)">Arxivlash</button> } else { <button class="btn" @onclick="() => SetStatusAsync(TestStatus.Draft)">Arxivdan chiqarish</button> }
+                <button class="btn" @onclick="DuplicateAsync"><Icon Name="copy" /> Nusxa</button>
+                @if (isAdmin) { <button class="btn danger" @onclick="DeleteAsync"><Icon Name="trash" /></button> }
+            </div>
+        </div>
+        @if (validation.Count > 0) { <div class="alert danger mt"><b>Chop etib bo'lmaydi:</b><ul>@foreach (var v in validation) { <li>@v</li> }</ul></div> }
+        else if (validated) { <div class="alert ok mt">✓ Validatsiyadan o'tdi.</div> }
+    </div>
+
+    <div class="tabs"><button class="tab @(tab == "builder" ? "active" : "")" @onclick="@(() => tab = "builder")">Modullar</button><button class="tab @(tab == "attempts" ? "active" : "")" @onclick="@(() => tab = "attempts")">Urinishlar (@attempts.Count)</button></div>
+
+    @if (tab == "builder")
+    {
+        <div class="stack">
+            @foreach (var m in t.Modules)
+            {
+                <div class="module-card">
+                    <div class="module-head">
+                        <span class="badge @(m.Section == Section.RW ? "rw" : "math")">@Labels.SectionShort(m.Section)</span><span class="title">@m.Title</span>
+                        <span class="muted small">@m.Questions.Count ta savol · @Labels.Minutes(m.TimeLimitSeconds)</span>
+                        <div class="spacer" style="flex:1"></div>
+                        <button class="btn sm" @onclick="() => OpenPicker(m)"><Icon Name="plus" /> Savol qo'shish</button>
+                        <button class="btn sm" @onclick="() => OpenAuto(m)"><Icon Name="zap" /> Avto-generatsiya</button>
+                    </div>
+                    <div class="module-qs">
+                        @if (m.Questions.Count == 0) { <div class="small muted" style="padding:8px 4px">Savollar yo'q.</div> }
+                        @foreach (var q in m.Questions)
+                        {
+                            <div class="module-q">
+                                <span class="n">@(q.Order + 1).</span>
+                                <span class="badge">@q.Question.Skill.Name</span><span class="badge">@Labels.Difficulty(q.Question.Difficulty)</span>
+                                @if (q.Question.Status != QuestionStatus.Active) { <span class="badge danger">@Labels.QuestionStatus(q.Question.Status)</span> }
+                                <span class="txt" title="@ContentService.StripHtml(q.Question.Text)">#@q.QuestionId @ContentService.Preview(q.Question.Text, 90)</span>
+                                <button class="mini-btn" title="Yuqoriga" @onclick="() => MoveAsync(m.Id, q.QuestionId, -1)" disabled="@(q.Order == 0)"><Icon Name="chevron-up" Size="14" /></button>
+                                <button class="mini-btn" title="Pastga" @onclick="() => MoveAsync(m.Id, q.QuestionId, 1)" disabled="@(q.Order == m.Questions.Count - 1)"><Icon Name="chevron-down" Size="14" /></button>
+                                <a class="mini-btn" title="Savolni ochish" href="/admin/questions/@q.QuestionId" target="_blank"><Icon Name="external" Size="14" /></a>
+                                <button class="mini-btn" title="Olib tashlash" @onclick="() => RemoveAsync(m.Id, q.QuestionId)"><Icon Name="x" Size="14" /></button>
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="card pad-0">
+            @if (attempts.Count == 0) { <div class="empty"><h3>Hali urinishlar yo'q</h3></div> }
+            else { <div class="table-wrap"><table class="table"><thead><tr><th>O'quvchi</th><th>Boshlangan</th><th>Holat</th><th class="num">Umumiy</th><th class="num">R&W</th><th class="num">Math</th><th></th></tr></thead><tbody>@foreach (var a in attempts) { <tr><td class="bold">@a.Student.User.FullName</td><td>@Tz.Fmt(a.StartedAt)</td><td><span class="badge @(a.Status == AttemptStatus.Completed ? "ok" : "warn")">@Labels.AttemptStatus(a.Status)</span></td><td class="num bold">@(a.TotalScore?.ToString() ?? "—")</td><td class="num">@(a.RwScore?.ToString() ?? $"{a.RwRaw}/{a.RwMax}")</td><td class="num">@(a.MathScore?.ToString() ?? $"{a.MathRaw}/{a.MathMax}")</td><td class="row">@if (a.Status == AttemptStatus.Completed) { <a class="btn sm" href="/attempt/@a.Id/review">Javoblar</a>@if (isAdmin) { <button class="btn sm" @onclick="() => RecalcAsync(a.Id)">Qayta hisoblash</button> } }</td></tr> }</tbody></table></div> }
+        </div>
+    }
+
+    <Modal Open="picker is not null" OpenChanged="v => { if (!v) picker = null; }" Title="@($"Savol qo'shish — {picker?.Title}")" Wide="true">
+        <div class="row mb">
+            <input class="input sm" style="width:220px" placeholder="Qidirish" @bind="pf.Search" @bind:event="oninput" @bind:after="SearchAsync" />
+            <select class="input sm" @bind="pf.SkillId" @bind:after="SearchAsync"><option value="">Skill</option>@foreach (var s in domains.Where(d => picker is not null && d.Section == picker.Section).SelectMany(d => d.Skills)) { <option value="@s.Id">@s.Name</option> }</select>
+            <select class="input sm" @bind="pf.Difficulty" @bind:after="SearchAsync"><option value="">Qiyinlik</option>@foreach (var d in Enum.GetValues<Difficulty>()) { <option value="@d">@Labels.Difficulty(d)</option> }</select>
+            <span class="muted small">@ptotal ta topildi · @selected.Count tanlandi</span>
+            <div style="flex:1"></div>
+            <button class="btn sm primary" @onclick="AddSelectedAsync" disabled="@(selected.Count == 0)">Tanlanganlarni qo'shish</button>
+        </div>
+        <div class="table-wrap" style="max-height:55vh;overflow:auto"><table class="table"><thead><tr><th></th><th>#</th><th>Skill</th><th>Qiyinlik</th><th>Tur</th><th>Savol</th><th class="num">Aniqlik</th></tr></thead>
+            <tbody>@foreach (var r in prows) { <tr class="click" @onclick="() => Toggle(r.Id)"><td><input type="checkbox" checked="@selected.Contains(r.Id)" /></td><td class="muted">@r.Id</td><td>@r.Skill</td><td>@Labels.Difficulty(r.Difficulty)</td><td>@(r.Type == QuestionType.SPR ? "SPR" : "MC")</td><td>@r.Preview</td><td class="num">@(r.AttemptCount == 0 ? "—" : $"{r.CorrectCount * 100 / r.AttemptCount}%")</td></tr> }</tbody></table></div>
+        <div class="pager"><button class="btn sm" @onclick="() => PPage(-1)" disabled="@(pf.Page <= 1)">←</button><span>@pf.Page</span><button class="btn sm" @onclick="() => PPage(1)" disabled="@(pf.Page * pf.PageSize >= ptotal)">→</button></div>
+    </Modal>
+
+    <Modal Open="autoFor is not null" OpenChanged="v => { if (!v) autoFor = null; }" Title="@($"Avto-generatsiya — {autoFor?.Title}")">
+        <div class="form-row"><div><label class="lbl">Savollar soni</label><input class="input" type="number" min="1" max="60" @bind="rule.Count" /></div></div>
+        <label class="lbl">Qiyinlik taqsimoti (%)</label>
+        <div class="form-row"><div><label class="lbl">Oson</label><input class="input" type="number" @bind="rule.EasyPercent" /></div><div><label class="lbl">O'rta</label><input class="input" type="number" @bind="rule.MediumPercent" /></div><div><label class="lbl">Qiyin</label><input class="input" type="number" @bind="rule.HardPercent" /></div></div>
+        <label class="lbl">Domain taqsimoti (%, bo'sh = ixtiyoriy)</label>
+        @foreach (var d in domains.Where(d => autoFor is not null && d.Section == autoFor.Section)) { <div class="row mb-s"><span style="width:260px">@d.Name</span><input class="input sm" style="width:90px" type="number" min="0" max="100" value="@(rule.DomainPercents.GetValueOrDefault(d.Id))" @onchange="e => SetDomainPct(d.Id, e.Value?.ToString())" /></div> }
+        <label class="check mt"><input type="checkbox" @bind="rule.Replace" /> Moduldagi mavjud savollarni almashtirish</label>
+        @if (autoError is not null) { <div class="alert danger mt" style="white-space:pre-line">@autoError</div> }
+        <div class="modal-actions"><button class="btn" @onclick="() => autoFor = null">Bekor</button><button class="btn primary" @onclick="AutoAsync" disabled="@busy"><Icon Name="zap" /> Generatsiya</button></div>
+    </Modal>
+
+    <Modal Open="settingsOpen" OpenChanged="v => settingsOpen = v" Title="Test sozlamalari">
+        <label class="lbl">Nomi</label><input class="input" @bind="st.Title" />
+        <label class="lbl">Tavsif</label><textarea class="input" @bind="st.Description" rows="2"></textarea>
+        <div class="form-row"><div><label class="lbl">Tanaffus (soniya)</label><input class="input" type="number" min="0" @bind="st.Break" /></div><div><label class="lbl">Scoring version</label><select class="input" @bind="st.Scoring">@foreach (var v in versions) { <option value="@v">@v</option> }</select></div></div>
+        <label class="lbl">Modullar vaqti (soniya)</label>
+        @foreach (var m in t.Modules) { <div class="row mb-s"><span style="width:260px">@m.Title</span><input class="input sm" style="width:120px" type="number" min="60" value="@st.Seconds[m.Id]" @onchange="e => st.Seconds[m.Id] = int.TryParse(e.Value?.ToString(), out var v) ? v : m.TimeLimitSeconds" /></div> }
+        <label class="check mt"><input type="checkbox" @bind="st.Shuffle" /> Savollar tartibini har o'quvchi uchun aralashtirish</label>
+        <label class="check mt-s"><input type="checkbox" @bind="st.Public" /> Barcha o'quvchilarga tayinlovsiz ochiq</label>
+        <div class="modal-actions"><button class="btn" @onclick="() => settingsOpen = false">Bekor</button><button class="btn primary" @onclick="SaveSettingsAsync">Saqlash</button></div>
+    </Modal>
+}
+
+@code {
+    [Parameter] public int TestId { get; set; }
+    private Test? t;
+    private List<TestAttempt> attempts = [];
+    private List<Domain> domains = [];
+    private List<string> validation = [];
+    private List<string> versions = [];
+    private bool validated, busy, isAdmin, settingsOpen;
+    private string tab = "builder";
+    private TestModule? picker, autoFor;
+    private readonly QuestionFilter pf = new() { Status = QuestionStatus.Active, PageSize = 30 };
+    private List<QuestionRow> prows = [];
+    private int ptotal;
+    private readonly HashSet<int> selected = [];
+    private AutoGenerateRule rule = new();
+    private string? autoError;
+    private class SettingsModel { public string Title = ""; public string? Description; public int Break; public string Scoring = ""; public bool Shuffle, Public; public Dictionary<int, int> Seconds = new(); }
+    private SettingsModel st = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Test builder");
+        isAdmin = await Me.IsAdminAsync();
+        domains = await Content.DomainsAsync();
+        versions = await Scoring.VersionsAsync();
+        await LoadAsync();
+        Loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        t = await Builder.GetAsync(TestId);
+        if (t is null) return;
+        attempts = await Engine.AttemptsForTestAsync(TestId);
+        validation = await Builder.ValidateAsync(TestId); validated = true;
+        st = new SettingsModel { Title = t.Title, Description = t.Description, Break = t.BreakSeconds, Scoring = t.ScoringVersion, Shuffle = t.ShuffleQuestions, Public = t.IsPublic, Seconds = t.Modules.ToDictionary(m => m.Id, m => m.TimeLimitSeconds) };
+    }
+
+    private async Task OpenPicker(TestModule m) { picker = m; selected.Clear(); pf.Section = m.Section; pf.ExcludeModuleId = m.Id; pf.Page = 1; pf.SkillId = null; pf.Search = null; await SearchAsync(); }
+    private async Task SearchAsync() { (prows, ptotal) = await Content.SearchAsync(pf); }
+    private async Task PPage(int d) { pf.Page = Math.Max(1, pf.Page + d); await SearchAsync(); }
+    private void Toggle(int id) { if (!selected.Remove(id)) selected.Add(id); }
+    private async Task AddSelectedAsync()
+    {
+        var warn = await Builder.AddQuestionsAsync(picker!.Id, selected, await Me.IdAsync());
+        if (warn is not null) Toasts.Show(warn); else Toasts.Ok($"{selected.Count} ta savol qo'shildi");
+        picker = null; await LoadAsync();
+    }
+    private async Task RemoveAsync(int moduleId, int qid) { await Builder.RemoveQuestionAsync(moduleId, qid); await LoadAsync(); }
+    private async Task MoveAsync(int moduleId, int qid, int d) { await Builder.MoveQuestionAsync(moduleId, qid, d); await LoadAsync(); }
+
+    private void OpenAuto(TestModule m)
+    {
+        autoFor = m; autoError = null;
+        rule = new AutoGenerateRule { Count = m.Section == Section.RW ? 27 : 22 };
+        (rule.EasyPercent, rule.MediumPercent, rule.HardPercent) = m.Route switch { ModuleRoute.Easy => (50, 40, 10), ModuleRoute.Hard => (10, 40, 50), _ => (25, 50, 25) };
+    }
+    private void SetDomainPct(int id, string? v) { if (int.TryParse(v, out var p) && p > 0) rule.DomainPercents[id] = p; else rule.DomainPercents.Remove(id); }
+    private async Task AutoAsync()
+    {
+        busy = true; autoError = await Builder.AutoGenerateAsync(autoFor!.Id, rule, await Me.IdAsync()); busy = false;
+        if (autoError is null) { Toasts.Ok("Savollar generatsiya qilindi"); autoFor = null; await LoadAsync(); }
+    }
+
+    private async Task PublishAsync()
+    {
+        busy = true;
+        validation = await Builder.PublishAsync(TestId, await Me.IdAsync());
+        busy = false;
+        if (validation.Count == 0) { Toasts.Ok("Test chop etildi"); await LoadAsync(); }
+    }
+    private async Task SetStatusAsync(TestStatus s) { await Builder.SetStatusAsync(TestId, s, await Me.IdAsync()); await LoadAsync(); }
+    private async Task DuplicateAsync() { var id = await Builder.DuplicateAsync(TestId, await Me.IdAsync()); Nav.NavigateTo($"/admin/tests/{id}"); }
+    private async Task DeleteAsync()
+    {
+        if (!await ConfirmAsync("Testni o'chirasizmi?")) return;
+        var err = await Builder.DeleteAsync(TestId, await Me.IdAsync());
+        if (err is not null) { Toasts.Error(err); return; }
+        Nav.NavigateTo("/admin/tests");
+    }
+    private async Task PreviewAsync()
+    {
+        try { var a = await Engine.StartPreviewAsync(await Me.IdAsync(), TestId); Nav.NavigateTo($"/attempt/{a.Id}"); }
+        catch (AppException ex) { Toasts.Error(ex.Message); }
+    }
+    private async Task SaveSettingsAsync()
+    {
+        await TryAsync(() => Builder.UpdateAsync(TestId, st.Title, st.Description, st.Break, st.Shuffle, st.Public, st.Scoring, st.Seconds, 0), "Saqlandi");
+        settingsOpen = false; await LoadAsync();
+    }
+    private async Task RecalcAsync(int attemptId)
+    {
+        var err = await Engine.RecalculateAsync(attemptId, await Me.IdAsync(), "admin recalculation from test page");
+        if (err is not null) Toasts.Error(err); else { Toasts.Ok("Qayta hisoblandi"); await LoadAsync(); }
+    }
+}

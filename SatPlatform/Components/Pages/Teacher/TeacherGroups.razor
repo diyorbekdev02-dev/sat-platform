@@ -1,0 +1,38 @@
+@page "/teacher/groups"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+@inject AnalyticsService Analytics
+
+<PageTitle>Guruhlar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (perf.Count == 0) { <div class="card"><div class="empty"><div class="big">👥</div><h3>Guruhlar yo'q</h3><p class="small">Sizga hali guruh biriktirilmagan.</p></div></div> }
+else
+{
+    <div class="grid c2">
+        @foreach (var g in perf)
+        {
+            var group = groups.First(x => x.Id == g.GroupId);
+            <a class="card" href="/teacher/groups/@g.GroupId" style="text-decoration:none">
+                <div class="row between"><h2>@g.Group</h2><span class="badge">@g.Students o'quvchi</span></div>
+                <div class="small muted mt-s">@(g.Teacher ?? "O'qituvchi biriktirilmagan") · @Labels.Days(group.ScheduleDays) @group.StartTime?.ToString("HH:mm")–@group.EndTime?.ToString("HH:mm") · xona @(group.Room ?? "—")</div>
+                <div class="row mt-s"><span class="badge accent">O'rtacha ball @(g.AvgScore?.ToString() ?? "—")</span><span class="badge">Aniqlik @(g.AvgAccuracy?.ToString() ?? "—")%</span><span class="badge @(g.Attendance is < 80 ? "danger" : "ok")">Davomat @(g.Attendance?.ToString() ?? "—")%</span></div>
+            </a>
+        }
+    </div>
+}
+
+@code {
+    private List<Group> groups = [];
+    private List<AnalyticsService.GroupPerf> perf = [];
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Guruhlar");
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        var scope = await Academy.GroupScopeAsync(uid, role);
+        groups = await Academy.GroupsAsync(scope);
+        perf = await Analytics.GroupPerformanceAsync(scope);
+        Loading = false;
+    }
+}

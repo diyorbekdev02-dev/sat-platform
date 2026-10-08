@@ -1,0 +1,26 @@
+# Render Blueprint: Dashboard -> New -> Blueprint -> this repo.
+# Fill in DATABASE_URL (Neon) and Telegram__BotToken when asked.
+services:
+  - type: web
+    name: sat-platform
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: Telegram__BotToken
+        sync: false
+      - key: Telegram__BotUsername
+        sync: false
+      - key: Seed__AdminPassword
+        sync: false
+      - key: App__PublicUrl
+        value: https://sat-platform.onrender.com
+      - key: App__KeepAlive
+        value: "true"
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Production

@@ -1,0 +1,124 @@
+@page "/teacher/assign"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+@inject TestBuilderService Builder
+@inject TestEngineService Engine
+
+<PageTitle>Test tayinlash</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="grid c2">
+        <div class="card">
+            <h2>Yangi tayinlov</h2>
+            <label class="lbl">Test</label>
+            <select class="input" @bind="testId"><option value="0">— tanlang —</option>@foreach (var t in tests) { <option value="@t.Id">@t.Title (@Labels.TestType(t.Type))</option> }</select>
+            <label class="lbl">Kimga</label>
+            <div class="chips"><button class="chip @(target == "group" ? "active" : "")" @onclick="@(() => target = "group")">Guruh</button><button class="chip @(target == "student" ? "active" : "")" @onclick="@(() => target = "student")">Alohida o'quvchi</button></div>
+            @if (target == "group") { <select class="input mt-s" @bind="groupId"><option value="0">— guruh —</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select> }
+            else { <select class="input mt-s" @bind="studentId"><option value="0">— o'quvchi —</option>@foreach (var s in students) { <option value="@s.Id">@s.User.FullName</option> }</select> }
+            <div class="form-row">
+                <div><label class="lbl">Boshlanish</label><input class="input" type="datetime-local" @bind="startAt" /></div>
+                <div><label class="lbl">Muddat (ixtiyoriy)</label><input class="input" type="datetime-local" @bind="endAt" /></div>
+            </div>
+            <label class="lbl">Urinishlar soni (bo'sh = cheksiz)</label>
+            <input class="input" type="number" min="1" max="20" @bind="limit" />
+            @if (Error is not null) { <div class="alert danger mt">@Error</div> }
+            <button class="btn primary mt" @onclick="AssignAsync" disabled="@busy"><Icon Name="send" /> Tayinlash</button>
+        </div>
+        <div class="card">
+            <h2>Tayinlovlar</h2>
+            @if (assignments.Count == 0) { <p class="muted small mt-s">Hali tayinlovlar yo'q.</p> }
+            <div class="list">
+                @foreach (var a in assignments)
+                {
+                    <div class="list-item">
+                        <div class="grow"><div class="title">@a.Test.Title</div><div class="sub">@(a.Group?.Name ?? a.Student?.User.FullName) · @Tz.Fmt(a.StartAt) → @Tz.Fmt(a.EndAt) · urinish: @(a.AttemptLimit?.ToString() ?? "∞")</div></div>
+                        <button class="btn sm" @onclick="() => ShowResultsAsync(a)">Natijalar</button>
+                        <button class="btn sm danger" @onclick="() => DeleteAsync(a.Id)"><Icon Name="trash" Size="14" /></button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <Modal Open="results is not null" OpenChanged="v => { if (!v) results = null; }" Title="@($"Natijalar: {resultsTitle}")" Wide="true">
+        @if (results is not null)
+        {
+            @if (results.Count == 0) { <p class="muted">Hali hech kim ishlamagan.</p> }
+            else { <div class="table-wrap"><table class="table"><thead><tr><th>O'quvchi</th><th>Sana</th><th>Holat</th><th class="num">Umumiy</th><th class="num">R&W</th><th class="num">Math</th><th></th></tr></thead><tbody>@foreach (var r in results) { <tr><td class="bold">@r.Student.User.FullName</td><td>@Tz.Fmt(r.StartedAt)</td><td><span class="badge @(r.Status == AttemptStatus.Completed ? "ok" : "warn")">@Labels.AttemptStatus(r.Status)</span></td><td class="num bold">@(r.TotalScore?.ToString() ?? (r.Status == AttemptStatus.Completed ? $"{r.RwRaw + r.MathRaw}/{r.RwMax + r.MathMax}" : "—"))</td><td class="num">@(r.RwScore?.ToString() ?? "—")</td><td class="num">@(r.MathScore?.ToString() ?? "—")</td><td>@if (r.Status == AttemptStatus.Completed) { <a class="btn sm" href="/attempt/@r.Id/review">Javoblar</a> }</td></tr> }</tbody></table></div> }
+        }
+    </Modal>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "group")] public int? QGroup { get; set; }
+    [SupplyParameterFromQuery(Name = "student")] public int? QStudent { get; set; }
+    [SupplyParameterFromQuery(Name = "test")] public int? QTest { get; set; }
+    private List<TestRow> tests = [];
+    private List<Group> groups = [];
+    private List<Data.Student> students = [];
+    private List<TestAssignment> assignments = [];
+    private List<TestAttempt>? results;
+    private string resultsTitle = "", target = "group";
+    private int testId, groupId, studentId;
+    private int? limit = 1;
+    private DateTime startAt = Tz.ToLocal(DateTime.UtcNow), endAt = Tz.ToLocal(DateTime.UtcNow).AddDays(7);
+    private bool busy;
+    private int uid; private UserRole role;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Test tayinlash");
+        uid = await Me.IdAsync(); role = (await Me.RoleAsync())!.Value;
+        tests = await Builder.ListAsync(TestStatus.Published);
+        var scope = await Academy.GroupScopeAsync(uid, role);
+        groups = await Academy.GroupsAsync(scope);
+        students = await Academy.StudentsAsync(StudentStatus.Active, ids: await Academy.StudentScopeAsync(uid, role));
+        if (QGroup is int g) groupId = g;
+        if (QStudent is int s) { studentId = s; target = "student"; }
+        if (QTest is int t) testId = t;
+        await LoadAssignmentsAsync();
+        if (QTest is not null && QGroup is not null) { var a = assignments.FirstOrDefault(x => x.TestId == QTest && x.GroupId == QGroup); if (a is not null) await ShowResultsAsync(a); }
+        Loading = false;
+    }
+
+    private async Task LoadAssignmentsAsync()
+    {
+        var all = await Builder.AssignmentsAsync();
+        var scope = await Academy.GroupScopeAsync(uid, role);
+        var sscope = await Academy.StudentScopeAsync(uid, role);
+        assignments = role is UserRole.Admin or UserRole.SuperAdmin ? all : all.Where(a => a.AssignedByUserId == uid || (a.GroupId is int g && scope.Contains(g)) || (a.StudentId is int s && sscope.Contains(s))).ToList();
+    }
+
+    private async Task AssignAsync()
+    {
+        Error = null;
+        if (testId == 0) { Error = "Testni tanlang."; return; }
+        busy = true;
+        try
+        {
+            await Builder.AssignAsync(testId, target == "student" ? studentId : null, target == "group" ? groupId : null, Tz.ToUtc(startAt), endAt == default ? null : Tz.ToUtc(endAt), limit, uid);
+            Toasts.Ok("Test tayinlandi");
+            await LoadAssignmentsAsync();
+        }
+        catch (AppException ex) { Error = ex.Message; }
+        finally { busy = false; }
+    }
+
+    private async Task DeleteAsync(int id)
+    {
+        if (!await ConfirmAsync("Tayinlovni o'chirasizmi? Ishlangan urinishlar saqlanib qoladi.")) return;
+        await Builder.DeleteAssignmentAsync(id, uid);
+        await LoadAssignmentsAsync();
+    }
+
+    private async Task ShowResultsAsync(TestAssignment a)
+    {
+        resultsTitle = $"{a.Test.Title} — {a.Group?.Name ?? a.Student?.User.FullName}";
+        var all = await Engine.AttemptsForAssignmentAsync(a.Id);
+        results = all;
+    }
+}

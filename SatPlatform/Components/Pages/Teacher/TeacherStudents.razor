@@ -1,0 +1,47 @@
+@page "/teacher/students"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+@inject AnalyticsService Analytics
+
+<PageTitle>O'quvchilar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="row between mb">
+        <input class="input" style="max-width:320px" placeholder="Ism yoki telefon bo'yicha qidirish" @bind="search" @bind:event="oninput" />
+        <div class="chips"><button class="chip @(sort == "name" ? "active" : "")" @onclick="@(() => sort = "name")">Ism</button><button class="chip @(sort == "score" ? "active" : "")" @onclick="@(() => sort = "score")">Ball</button><button class="chip @(sort == "weak" ? "active" : "")" @onclick="@(() => sort = "weak")">Eng zaif</button><button class="chip @(sort == "active" ? "active" : "")" @onclick="@(() => sort = "active")">Faollik</button></div>
+    </div>
+    <div class="card pad-0"><div class="table-wrap"><table class="table">
+        <thead><tr><th>Ism</th><th>Guruh</th><th class="num">Ball</th><th class="num">Aniqlik</th><th class="num">Davomat</th><th>Eng zaif skill</th><th>Oxirgi faollik</th><th></th></tr></thead>
+        <tbody>@foreach (var s in Sorted)
+        {
+            <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/students/{s.StudentId}"))">
+                <td class="bold">@s.Name<div class="tiny muted">@s.Phone</div></td><td>@s.Groups</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num @(s.Accuracy is < 50 ? "level-weak" : "")">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num @(s.Attendance is < 80 ? "level-weak" : "")">@(s.Attendance?.ToString() ?? "—")%</td>
+                <td>@(s.WeakestSkill is null ? "—" : $"{s.WeakestSkill} ({s.WeakestAccuracy}%)")</td><td>@Tz.Fmt(s.LastActive)</td><td><a class="btn sm" href="/teacher/students/@s.StudentId">Ochish</a></td>
+            </tr>
+        }</tbody></table></div>
+        @if (students.Count == 0) { <div class="empty"><h3>O'quvchilar yo'q</h3></div> }
+    </div>
+}
+
+@code {
+    private List<AnalyticsService.StudentSummary> students = [];
+    private string search = "", sort = "name";
+    private IEnumerable<AnalyticsService.StudentSummary> Sorted
+    {
+        get
+        {
+            var q = students.Where(s => string.IsNullOrWhiteSpace(search) || s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || s.Phone.Contains(search));
+            return sort switch { "score" => q.OrderByDescending(s => s.Score ?? 0), "weak" => q.OrderBy(s => s.Accuracy ?? 101), "active" => q.OrderByDescending(s => s.LastActive), _ => q.OrderBy(s => s.Name) };
+        }
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("O'quvchilar");
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        students = await Analytics.StudentSummariesAsync(await Academy.StudentScopeAsync(uid, role));
+        Loading = false;
+    }
+}

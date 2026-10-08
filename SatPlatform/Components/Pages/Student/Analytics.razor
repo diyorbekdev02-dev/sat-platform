@@ -1,0 +1,12 @@
+@page "/analytics"
+@attribute [Authorize(Roles = "Student")]
+@inherits AppPage
+
+<PageTitle>Mening progressim</PageTitle>
+
+@if (sid is int id) { <StudentProgressPanel StudentId="id" Self="true" /> }
+
+@code {
+    private int? sid;
+    protected override async Task OnInitializedAsync() { SetTitle("Mening progressim"); sid = await Me.StudentIdAsync(); }
+}

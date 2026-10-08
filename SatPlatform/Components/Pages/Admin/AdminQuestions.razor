@@ -1,0 +1,111 @@
+@page "/admin/questions"
+@attribute [Authorize(Roles = "Admin,SuperAdmin,Teacher")]
+@inherits AppPage
+@inject ContentService Content
+
+<PageTitle>Savollar banki</PageTitle>
+
+@if (!canManage) { <div class="empty"><div class="big">🔒</div><h3>Savollar bankiga ruxsatingiz yo'q</h3><p class="small">Administrator sizga ruxsat berishi mumkin.</p></div> }
+else
+{
+    <div class="row between mb">
+        <div class="row">
+            <input class="input sm" style="width:220px" placeholder="Qidirish (matn, #id, teg)" @bind="f.Search" @bind:event="oninput" @bind:after="Reload" />
+            <select class="input sm" @bind="section" @bind:after="Reload"><option value="">Bo'lim</option><option value="0">R&W</option><option value="1">Math</option></select>
+            <select class="input sm" @bind="f.DomainId" @bind:after="Reload"><option value="">Domain</option>@foreach (var d in domains.Where(d => section == "" || (int)d.Section == int.Parse(section))) { <option value="@d.Id">@d.Name</option> }</select>
+            <select class="input sm" @bind="f.SkillId" @bind:after="Reload"><option value="">Skill</option>@foreach (var s in domains.Where(d => (f.DomainId is null || d.Id == f.DomainId) && (section == "" || (int)d.Section == int.Parse(section))).SelectMany(d => d.Skills)) { <option value="@s.Id">@s.Name</option> }</select>
+            <select class="input sm" @bind="f.Difficulty" @bind:after="Reload"><option value="">Qiyinlik</option>@foreach (var d in Enum.GetValues<Difficulty>()) { <option value="@d">@Labels.Difficulty(d)</option> }</select>
+            <select class="input sm" @bind="f.Status" @bind:after="Reload"><option value="">Holat</option>@foreach (var s in Enum.GetValues<QuestionStatus>()) { <option value="@s">@Labels.QuestionStatus(s)</option> }</select>
+            <select class="input sm" @bind="f.Type" @bind:after="Reload"><option value="">Tur</option><option value="MultipleChoice">Multiple choice</option><option value="SPR">SPR</option></select>
+        </div>
+        <div class="row">
+            @if (isAdmin) { <button class="btn sm" @onclick="() => importOpen = true"><Icon Name="upload" /> Import</button><button class="btn sm" @onclick="ExportAsync"><Icon Name="download" /> Export</button> }
+            <a class="btn primary" href="/admin/questions/new"><Icon Name="plus" /> Yangi savol</a>
+        </div>
+    </div>
+    <div class="row mb small muted">
+        <span>Jami: <b>@counts.GetValueOrDefault("Total")</b></span><span>Faol: <b>@counts.GetValueOrDefault("Active")</b></span><span>Qoralama: <b>@counts.GetValueOrDefault("Draft")</b></span><span>Arxiv: <b>@counts.GetValueOrDefault("Archived")</b></span>
+    </div>
+    <div class="card pad-0">
+        @if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+        else if (rows.Count == 0) { <div class="empty"><h3>Savollar topilmadi</h3></div> }
+        else
+        {
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th>#</th><th>Bo'lim</th><th>Domain / Skill</th><th>Qiyinlik</th><th>Tur</th><th>Savol</th><th>Holat</th><th class="num">Aniqlik</th><th></th></tr></thead>
+                <tbody>@foreach (var r in rows)
+                {
+                    <tr class="click" @onclick="@(() => Nav.NavigateTo($"/admin/questions/{r.Id}"))">
+                        <td class="muted">@r.Id</td><td><span class="badge @(r.Section == Section.RW ? "rw" : "math")">@Labels.SectionShort(r.Section)</span></td><td>@r.Skill<div class="tiny muted">@r.Domain</div></td><td>@Labels.Difficulty(r.Difficulty)</td><td>@(r.Type == QuestionType.SPR ? "SPR" : "MC")</td>
+                        <td>@r.Preview @(r.Tag is null ? "" : "")@if (r.Tag is not null) { <span class="badge">@r.Tag</span> }</td>
+                        <td><span class="badge @(r.Status == QuestionStatus.Active ? "ok" : r.Status == QuestionStatus.Archived ? "" : "warn")">@Labels.QuestionStatus(r.Status)</span></td>
+                        <td class="num">@(r.AttemptCount == 0 ? "—" : $"{r.CorrectCount * 100 / r.AttemptCount}% ({r.AttemptCount})")</td>
+                        <td><a class="btn sm" href="/admin/questions/@r.Id"><Icon Name="pencil" Size="14" /></a></td>
+                    </tr>
+                }</tbody></table></div>
+            <div class="pager"><span class="muted">@total ta · sahifa @f.Page / @Math.Max(1, (total + f.PageSize - 1) / f.PageSize)</span><button class="btn sm" @onclick="() => Page(-1)" disabled="@(f.Page <= 1)">←</button><button class="btn sm" @onclick="() => Page(1)" disabled="@(f.Page * f.PageSize >= total)">→</button></div>
+        }
+    </div>
+
+    <Modal Open="importOpen" OpenChanged="v => importOpen = v" Title="Savollarni import qilish (JSON)">
+        <p class="small muted">JSON massiv: <code>skill</code> (kod yoki nom), <code>difficulty</code>, <code>type</code> (MultipleChoice/SPR), <code>passage</code>, <code>text</code>, <code>explanation</code>, <code>correctAnswer</code> (SPR), <code>options</code> [{key,text,isCorrect}], <code>status</code>. Export tugmasi namuna beradi.</p>
+        <div class="drop"><InputFile OnChange="OnImportFile" accept=".json" /> @(importName ?? "JSON faylni tanlang")</div>
+        @if (importResult is not null) { <div class="alert @(importErrors.Count == 0 ? "ok" : "warn") mt"><b>@importResult</b>@if (importErrors.Count > 0) { <ul>@foreach (var e in importErrors.Take(20)) { <li>@e</li> }</ul> }</div> }
+        <div class="modal-actions"><button class="btn" @onclick="() => importOpen = false">Yopish</button><button class="btn primary" @onclick="ImportAsync" disabled="@(importJson is null || busy)">Import</button></div>
+    </Modal>
+}
+
+@code {
+    private readonly QuestionFilter f = new();
+    private string section = "";
+    private List<QuestionRow> rows = [];
+    private List<Domain> domains = [];
+    private Dictionary<string, int> counts = new();
+    private int total;
+    private bool canManage, isAdmin, importOpen, busy;
+    private string? importJson, importName, importResult;
+    private List<string> importErrors = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Savollar banki");
+        canManage = await Me.CanManageQuestionsAsync();
+        isAdmin = await Me.IsAdminAsync();
+        if (!canManage) { Loading = false; return; }
+        domains = await Content.DomainsAsync();
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        Loading = true;
+        f.Section = section == "" ? null : (Section)int.Parse(section);
+        if (f.DomainId is not null && domains.FirstOrDefault(d => d.Id == f.DomainId) is { } dom && f.SkillId is not null && dom.Skills.All(s => s.Id != f.SkillId)) f.SkillId = null;
+        (rows, total) = await Content.SearchAsync(f);
+        counts = await Content.CountsAsync();
+        Loading = false;
+    }
+
+    private async Task Page(int d) { f.Page = Math.Max(1, f.Page + d); await Reload(); }
+
+    private async Task OnImportFile(InputFileChangeEventArgs e)
+    {
+        importName = e.File.Name; importResult = null; importErrors = [];
+        using var r = new StreamReader(e.File.OpenReadStream(20 * 1024 * 1024));
+        importJson = await r.ReadToEndAsync();
+    }
+
+    private async Task ImportAsync()
+    {
+        busy = true;
+        var (n, errors) = await Content.ImportJsonAsync(importJson!, await Me.IdAsync());
+        importResult = $"{n} ta savol import qilindi."; importErrors = errors; busy = false;
+        await Reload();
+    }
+
+    private async Task ExportAsync()
+    {
+        var json = await Content.ExportJsonAsync(f);
+        await JS.InvokeVoidAsync("sat.download", "questions.json", json, "application/json");
+    }
+}

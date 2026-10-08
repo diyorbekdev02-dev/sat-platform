@@ -1,0 +1,55 @@
+@* Quill-based HTML editor with image upload and $LaTeX$ support. *@
+@inject IJSRuntime JS
+@implements IAsyncDisposable
+
+<div class="editor @(Tall ? "tall" : "")">
+    <div id="@id"></div>
+</div>
+<div class="row small muted mt-s">
+    <span>Formula: <code>$x^2$</code> yoki <code>$$\frac{a}{b}$$</code> — ko'rinishda avtomatik render bo'ladi.</span>
+    <button type="button" class="btn sm" @onclick="InsertTable">Jadval qo'shish (3×3)</button>
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "";
+    [Parameter] public bool Tall { get; set; }
+
+    private readonly string id = "ed" + Guid.NewGuid().ToString("N")[..8];
+    private DotNetObjectReference<RichEditor>? self;
+    private string? lastPushed;
+    private bool initialized;
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first)
+        {
+            self = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("sat.initEditor", id, Value ?? "", self, Placeholder);
+            lastPushed = Value; initialized = true;
+        }
+        else if (initialized && Value != lastPushed && Value != lastReceived)
+        {
+            await JS.InvokeVoidAsync("sat.initEditor", id, Value ?? "", self, Placeholder);
+            lastPushed = Value;
+        }
+    }
+
+    private string? lastReceived;
+
+    [JSInvokable]
+    public async Task OnEditorChanged(string html)
+    {
+        lastReceived = html; lastPushed = html;
+        await ValueChanged.InvokeAsync(html);
+    }
+
+    private Task InsertTable() => JS.InvokeVoidAsync("sat.insertTable", id, 3, 3).AsTask();
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await JS.InvokeVoidAsync("sat.destroyEditor", id); } catch { }
+        self?.Dispose();
+    }
+}

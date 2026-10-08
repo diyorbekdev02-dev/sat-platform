@@ -1,0 +1,133 @@
+@page "/profile"
+@attribute [Authorize]
+@inherits AppPage
+@inject AuthService Auth
+@inject AcademyService Academy
+
+<PageTitle>Profil</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (user is not null)
+{
+    <div class="grid c2">
+        <div class="stack">
+            <div class="card">
+                <div class="row mb"><div class="avatar lg" style="background:@user.AvatarColor">@initials</div><div><h2>@user.FullName</h2><div class="muted small">@Labels.Role(user.Role) · @user.Phone</div></div></div>
+                <label class="lbl">Ism-familiya</label>
+                <input class="input" @bind="fullName" />
+                <label class="lbl">Email (ixtiyoriy)</label>
+                <input class="input" type="email" @bind="email" />
+                @if (user.Student is not null)
+                {
+                    <label class="lbl">Maqsad SAT ball</label>
+                    <input class="input" type="number" min="400" max="1600" step="10" @bind="targetScore" />
+                }
+                <h3 class="mt">Bildirishnomalar</h3>
+                <div class="stack mt-s" style="gap:6px">
+                    <label class="check"><input type="checkbox" @bind="nTests" /> Test natijalari</label>
+                    <label class="check"><input type="checkbox" @bind="nAtt" /> Davomat</label>
+                    <label class="check"><input type="checkbox" @bind="nHw" /> Uy vazifasi va tayinlangan testlar</label>
+                    <label class="check"><input type="checkbox" @bind="nRem" /> Kunlik mashq eslatmasi (Telegram)</label>
+                </div>
+                <button class="btn primary mt" @onclick="SaveAsync" disabled="@busy">Saqlash</button>
+            </div>
+
+            <div class="card">
+                <h2>Parol</h2>
+                @if (user.PasswordHash is not null) { <label class="lbl">Joriy parol</label><input class="input" type="password" @bind="currentPw" /> }
+                else { <div class="alert">Parol hali o'rnatilmagan (Telegram orqali ro'yxatdan o'tgansiz). Parol o'rnating — keyin telefon va parol bilan ham kira olasiz.</div> }
+                <label class="lbl">Yangi parol</label>
+                <input class="input" type="password" @bind="newPw" />
+                <label class="lbl">Takrorlang</label>
+                <input class="input" type="password" @bind="newPw2" />
+                <button class="btn mt" @onclick="ChangePwAsync" disabled="@busy">Parolni o'zgartirish</button>
+            </div>
+        </div>
+
+        <div class="stack">
+            <div class="card">
+                <h2>Telegram</h2>
+                @if (user.TelegramChatId is not null) { <div class="alert ok mt-s">✅ Telegram bog'langan@(user.TelegramUsername is null ? "" : $" (@{user.TelegramUsername})"). Bildirishnomalar botga keladi.</div> }
+                else if (Auth.BotConfigured) { <p class="small muted mt-s">Bildirishnomalarni Telegram'da olish uchun botni oching va telefon raqamingizni yuboring.</p><a class="btn telegram" href="https://t.me/@Auth.BotUsername" target="_blank"><Icon Name="telegram" /> @@@Auth.BotUsername botini ochish</a> }
+                else { <p class="small muted mt-s">Telegram bot hali sozlanmagan.</p> }
+            </div>
+
+            @if (user.Student is not null)
+            {
+                <div class="card">
+                    <h2>Ota-ona kodi</h2>
+                    <p class="small muted mt-s">Ota-onangiz ro'yxatdan o'tganda shu kodni kiritsa, sizning natijalaringiz, davomat va progressingizni ko'ra oladi.</p>
+                    <div class="row"><span class="copy-code">@user.Student.ParentCode</span><button class="btn sm" @onclick="CopyCode"><Icon Name="copy" /> Nusxalash</button></div>
+                    @if (student is not null && student.Enrollments.Any(e => e.Status == EnrollmentStatus.Active))
+                    {
+                        <h3 class="mt">Guruhlarim</h3>
+                        <div class="list">@foreach (var e in student.Enrollments.Where(e => e.Status == EnrollmentStatus.Active)) { <div class="list-item"><div class="grow"><div class="title">@e.Group.Name</div><div class="sub">@(e.Group.TeacherUser?.FullName ?? "—") · @Labels.Days(e.Group.ScheduleDays) @(e.Group.StartTime?.ToString("HH:mm"))–@(e.Group.EndTime?.ToString("HH:mm"))</div></div></div> }</div>
+                    }
+                    @if (student is not null && student.Parents.Count > 0)
+                    {
+                        <h3 class="mt">Bog'langan ota-onalar</h3>
+                        <div class="list">@foreach (var p in student.Parents) { <div class="list-item"><div class="grow"><div class="title">@p.ParentUser.FullName</div><div class="sub">@p.ParentUser.Phone</div></div></div> }</div>
+                    }
+                </div>
+            }
+            @if (user.Role == UserRole.Parent)
+            {
+                <div class="card">
+                    <h2>Farzandlarim</h2>
+                    <div class="list mt-s">@foreach (var c in children) { <div class="list-item"><div class="avatar" style="background:@c.User.AvatarColor">@c.User.FullName[0]</div><div class="grow"><div class="title">@c.User.FullName</div><div class="sub">@string.Join(", ", c.Enrollments.Select(e => e.Group.Name))</div></div></div> }</div>
+                    <label class="lbl">Yana bir farzandni bog'lash (ota-ona kodi)</label>
+                    <div class="row"><input class="input" style="max-width:200px;text-transform:uppercase" @bind="childCode" maxlength="8" /><button class="btn" @onclick="LinkChildAsync" disabled="@busy">Bog'lash</button></div>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private User? user;
+    private Data.Student? student;
+    private List<Data.Student> children = [];
+    private string fullName = "", email = "", initials = "", currentPw = "", newPw = "", newPw2 = "", childCode = "";
+    private int? targetScore;
+    private bool nTests, nAtt, nHw, nRem, busy;
+
+    protected override async Task OnInitializedAsync() { SetTitle("Profil"); await LoadAsync(); Loading = false; }
+
+    private async Task LoadAsync()
+    {
+        user = await Auth.GetUserAsync(await Me.IdAsync());
+        if (user is null) return;
+        fullName = user.FullName; email = user.Email ?? ""; targetScore = user.Student?.TargetScore;
+        nTests = user.NotifyTestResults; nAtt = user.NotifyAttendance; nHw = user.NotifyHomework; nRem = user.NotifyPracticeReminder;
+        initials = string.Concat(user.FullName.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpperInvariant(p[0])));
+        if (user.Student is not null) student = await Academy.StudentAsync(user.Student.Id);
+        if (user.Role == UserRole.Parent) children = await Academy.ChildrenOfAsync(user.Id);
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var err = await Auth.UpdateProfileAsync(user!.Id, fullName, email, targetScore, nTests, nAtt, nHw, nRem);
+        busy = false;
+        if (err is not null) Toasts.Error(err); else { Toasts.Ok("Saqlandi"); await LoadAsync(); }
+    }
+
+    private async Task ChangePwAsync()
+    {
+        if (newPw != newPw2) { Toasts.Error("Parollar mos kelmadi."); return; }
+        busy = true;
+        var err = await Auth.ChangePasswordAsync(user!.Id, currentPw, newPw);
+        busy = false;
+        if (err is not null) Toasts.Error(err); else { Toasts.Ok("Parol o'zgartirildi"); currentPw = newPw = newPw2 = ""; await LoadAsync(); }
+    }
+
+    private async Task LinkChildAsync()
+    {
+        busy = true;
+        var err = await Auth.LinkChildAsync(user!.Id, childCode);
+        busy = false;
+        if (err is not null) Toasts.Error(err); else { Toasts.Ok("Farzand bog'landi"); childCode = ""; await LoadAsync(); }
+    }
+
+    private async Task CopyCode() { await JS.InvokeVoidAsync("sat.copy", user!.Student!.ParentCode); Toasts.Ok("Nusxalandi"); }
+}

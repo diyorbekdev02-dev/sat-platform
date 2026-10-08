@@ -1,0 +1,74 @@
+@page "/teacher/analytics"
+@page "/admin/analytics"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+@inject AnalyticsService Analytics
+
+<PageTitle>Tahlil</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="card mb">
+        <div class="form-row">
+            <div><label class="lbl">Guruh</label><select class="input" @bind="groupId" @bind:after="LoadAsync"><option value="0">Barcha guruhlar</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select></div>
+            <div><label class="lbl">Bo'lim</label><select class="input" @bind="section" @bind:after="LoadAsync"><option value="">Hammasi</option><option value="0">Reading & Writing</option><option value="1">Math</option></select></div>
+            @if (isAdmin) { <div><label class="lbl">Savol tahlili</label><select class="input" @bind="qsort" @bind:after="LoadAsync"><option value="hardest">Eng qiyin savollar</option><option value="easiest">Eng oson</option><option value="slowest">Eng sekin</option><option value="most">Eng ko'p ishlangan</option></select></div> }
+        </div>
+    </div>
+    <div class="grid c2 mb">
+        <div class="card"><div class="card-title"><h2>Skilllar bo'yicha aniqlik</h2><span class="muted small">@students.Count o'quvchi</span></div>
+            @if (skills.Count == 0) { <p class="muted small">Ma'lumot yo'q.</p> }
+            else { @foreach (var s in skills) { <div class="skill-row"><span class="name">@s.Skill <span class="tiny muted">@s.Domain · @s.Students o'quvchi · @s.Attempted javob</span></span><div class="progress @(s.Accuracy < thr.Weak ? "weak" : s.Accuracy > thr.Strong ? "strong" : "medium")"><span style="width:@(s.Accuracy)%"></span></div><span class="pct">@s.Accuracy.ToString("0")%</span></div> } }
+        </div>
+        <div class="card"><div class="card-title"><h2>Guruhlar</h2></div>
+            <div class="table-wrap"><table class="table"><thead><tr><th>Guruh</th><th class="num">O'quvchi</th><th class="num">O'rt. ball</th><th class="num">Aniqlik</th><th class="num">Davomat</th></tr></thead><tbody>@foreach (var g in perf) { <tr><td class="bold">@g.Group<div class="tiny muted">@g.Teacher</div></td><td class="num">@g.Students</td><td class="num bold">@(g.AvgScore?.ToString() ?? "—")</td><td class="num">@(g.AvgAccuracy?.ToString() ?? "—")%</td><td class="num">@(g.Attendance?.ToString() ?? "—")%</td></tr> }</tbody></table></div>
+        </div>
+    </div>
+    <div class="card mb pad-0">
+        <div class="card-title" style="padding:14px 16px 0"><h2>O'quvchilar</h2></div>
+        <div class="table-wrap"><table class="table"><thead><tr><th>O'quvchi</th><th>Guruh</th><th class="num">Ball</th><th class="num">Maqsad</th><th class="num">Aniqlik</th><th class="num">Testlar</th><th class="num">Mashqlar</th><th class="num">Davomat</th><th>Eng zaif</th></tr></thead>
+            <tbody>@foreach (var s in students.OrderBy(s => s.Accuracy ?? 101)) { <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/students/{s.StudentId}"))"><td class="bold">@s.Name</td><td>@s.Groups</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Target?.ToString() ?? "—")</td><td class="num @(s.Accuracy is < 50 ? "level-weak" : "")">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num">@s.Tests</td><td class="num">@s.Practices</td><td class="num">@(s.Attendance?.ToString() ?? "—")%</td><td>@(s.WeakestSkill is null ? "—" : $"{s.WeakestSkill} ({s.WeakestAccuracy}%)")</td></tr> }</tbody></table></div>
+    </div>
+    @if (isAdmin)
+    {
+        <div class="card pad-0">
+            <div class="card-title" style="padding:14px 16px 0"><h2>Savollar tahlili</h2><span class="muted small">kamida 5 ta urinish</span></div>
+            @if (questions.Count == 0) { <div class="empty"><h3>Hali yetarli ma'lumot yo'q</h3></div> }
+            else { <div class="table-wrap"><table class="table"><thead><tr><th>#</th><th>Savol</th><th>Skill</th><th>Qiyinlik</th><th class="num">Urinish</th><th class="num">Aniqlik</th><th class="num">O'rt. vaqt</th></tr></thead><tbody>@foreach (var q in questions) { <tr class="click" @onclick="@(() => Nav.NavigateTo($"/admin/questions/{q.Id}"))"><td>@q.Id</td><td>@q.Preview</td><td>@q.Skill</td><td>@Labels.Difficulty(q.Difficulty)</td><td class="num">@q.Attempts</td><td class="num @(q.Accuracy < 30 ? "level-weak" : "")">@q.Accuracy%</td><td class="num">@q.AvgTime s</td></tr> }</tbody></table></div> }
+        </div>
+    }
+}
+
+@code {
+    private List<Group> groups = [];
+    private List<AnalyticsService.GroupPerf> perf = [];
+    private List<AnalyticsService.StudentSummary> students = [];
+    private List<AnalyticsService.SkillAggregate> skills = [];
+    private List<AnalyticsService.QuestionAnalytics> questions = [];
+    private int groupId; private string section = "", qsort = "hardest";
+    private bool isAdmin; private int uid; private UserRole role;
+    private (int Weak, int Strong, int Min) thr;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Tahlil");
+        uid = await Me.IdAsync(); role = (await Me.RoleAsync())!.Value;
+        isAdmin = role is UserRole.Admin or UserRole.SuperAdmin;
+        groups = await Academy.GroupsAsync(await Academy.GroupScopeAsync(uid, role));
+        thr = await Analytics.ThresholdsAsync();
+        await LoadAsync();
+        Loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        var scope = groupId > 0 ? [groupId] : await Academy.GroupScopeAsync(uid, role);
+        perf = await Analytics.GroupPerformanceAsync(scope);
+        students = groupId > 0 ? await Analytics.StudentSummariesAsync(groupId: groupId) : await Analytics.StudentSummariesAsync(await Academy.StudentScopeAsync(uid, role));
+        var sec = section == "" ? (Section?)null : (Section)int.Parse(section);
+        skills = (await Analytics.GroupSkillsAsync(students.Select(s => s.StudentId))).Where(s => sec is null || s.Section == sec).ToList();
+        if (isAdmin) questions = await Analytics.QuestionAnalyticsAsync(sec, 5, qsort);
+    }
+}

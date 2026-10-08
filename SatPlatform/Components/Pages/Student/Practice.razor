@@ -1,0 +1,92 @@
+@page "/practice"
+@attribute [Authorize(Roles = "Student")]
+@inherits AppPage
+@inject ContentService Content
+@inject AnalyticsService Analytics
+@inject PracticeService PracticeSvc
+
+<PageTitle>Mashq</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    @if (active is not null)
+    {
+        <div class="alert warn mb"><div class="row between"><span>Tugallanmagan mashq: <b>@active.Title</b></span><a class="btn sm primary" href="/practice/@active.Id">Davom ettirish</a></div></div>
+    }
+
+    <h2 class="mb-s">Bo'limni tanlang</h2>
+    <div class="grid c2 mb">
+        @foreach (var s in new[] { Section.RW, Section.Math })
+        {
+            <a class="card" href="/practice/new?section=@((int)s)" style="text-decoration:none">
+                <div class="row between"><h2><span class="badge @(s == Section.RW ? "rw" : "math")">@Labels.SectionShort(s)</span> @Labels.Section(s)</h2><Icon Name="arrow-right" /></div>
+                <div class="small muted mt-s">@domains.Count(d => d.Section == s) ta domain · @domains.Where(d => d.Section == s).Sum(d => d.Skills.Count) ta skill</div>
+                <div class="chips mt-s">@foreach (var d in domains.Where(d => d.Section == s)) { <span class="chip">@d.Name</span> }</div>
+            </a>
+        }
+    </div>
+
+    <h2 class="mb-s">Tezkor mashq</h2>
+    <div class="row mb">
+        <a class="btn" href="/practice/new?count=10&mode=@((int)PracticeMode.Quick)"><Icon Name="zap" /> 10 ta savol</a>
+        <a class="btn" href="/practice/new?count=20&mode=@((int)PracticeMode.Standard)"><Icon Name="zap" /> 20 ta savol</a>
+        <a class="btn" href="/practice/new?count=30&mode=@((int)PracticeMode.Intensive)"><Icon Name="zap" /> 30 ta savol</a>
+        <a class="btn" href="/practice/new?mode=@((int)PracticeMode.Weakness)"><Icon Name="target" /> Zaif skilllar</a>
+        <a class="btn" href="/practice/new?mode=@((int)PracticeMode.Mistake)"><Icon Name="x-circle" /> Xatolarim ustida</a>
+        <a class="btn" href="/practice/new"><Icon Name="sliders" /> Maxsus mashq</a>
+    </div>
+
+    <h2 class="mb-s">Siz uchun tavsiya</h2>
+    @if (recs.Count == 0) { <div class="card mb"><p class="muted small">Tavsiyalar diagnostik test yoki bir nechta mashqdan so'ng paydo bo'ladi.</p></div> }
+    else
+    {
+        <div class="stack mb">
+            @foreach (var r in recs)
+            {
+                <div class="reco">
+                    <div class="grow"><div class="title">@r.Skill — @r.Accuracy.ToString("0")%</div><div class="small muted">@r.Reason · @r.Questions ta savol · @Labels.Difficulty(r.Difficulty)</div></div>
+                    <a class="btn primary" href="/practice/new?skill=@r.SkillId&count=@r.Questions&difficulty=@((int)r.Difficulty)&mode=@((int)PracticeMode.Recommended)"><Icon Name="play" /> Boshlash</a>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="card">
+        <div class="card-title"><h2>Mashqlar tarixi</h2></div>
+        @if (history.Count == 0) { <p class="muted small">Hali mashq ishlanmagan.</p> }
+        else
+        {
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th>Mashq</th><th>Rejim</th><th>Sana</th><th class="num">Natija</th><th class="num">Aniqlik</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var h in history)
+                    {
+                        <tr>
+                            <td>@h.Title</td><td><span class="badge">@Labels.PracticeMode(h.Mode)</span></td><td>@Tz.Fmt(h.StartedAt)</td>
+                            <td class="num">@h.CorrectCount / @h.QuestionCount</td><td class="num bold">@(h.QuestionCount == 0 ? 0 : h.CorrectCount * 100 / h.QuestionCount)%</td>
+                            <td><a class="btn sm" href="/practice/@h.Id/result">@(h.Status == PracticeStatus.InProgress ? "Davom ettirish" : "Ko'rish")</a></td>
+                        </tr>
+                    }
+                </tbody></table></div>
+        }
+    </div>
+}
+
+@code {
+    private List<Domain> domains = [];
+    private List<Recommendation> recs = [];
+    private List<Data.PracticeSession> history = [];
+    private Data.PracticeSession? active;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Mashq");
+        var sid = await Me.StudentIdAsync() ?? 0;
+        domains = await Content.DomainsAsync();
+        recs = await Analytics.RecommendationsAsync(sid, 2);
+        history = await PracticeSvc.HistoryAsync(sid, 20);
+        active = await PracticeSvc.ActiveAsync(sid);
+        Loading = false;
+    }
+}

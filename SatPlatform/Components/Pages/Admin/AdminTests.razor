@@ -1,0 +1,67 @@
+@page "/admin/tests"
+@attribute [Authorize(Roles = "Admin,SuperAdmin,Teacher")]
+@inherits AppPage
+@inject TestBuilderService Builder
+
+<PageTitle>Testlar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="row between mb">
+        <div class="chips"><button class="chip @(status is null ? "active" : "")" @onclick="() => Set(null)">Hammasi</button>@foreach (var s in Enum.GetValues<TestStatus>()) { <button class="chip @(status == s ? "active" : "")" @onclick="() => Set(s)">@Labels.TestStatus(s)</button> }</div>
+        <button class="btn primary" @onclick="() => createOpen = true"><Icon Name="plus" /> Yangi test</button>
+    </div>
+    <div class="card pad-0">
+        @if (tests.Count == 0) { <div class="empty"><h3>Testlar yo'q</h3></div> }
+        else
+        {
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th>Nomi</th><th>Tur</th><th>Adaptiv</th><th class="num">Modullar</th><th class="num">Savollar</th><th>Holat</th><th class="num">Urinishlar</th><th>O'zgartirilgan</th><th></th></tr></thead>
+                <tbody>@foreach (var t in tests)
+                {
+                    <tr class="click" @onclick="@(() => Nav.NavigateTo($"/admin/tests/{t.Id}"))">
+                        <td class="bold">@t.Title @if (t.IsPublic) { <span class="badge accent">ochiq</span> }</td><td>@Labels.TestType(t.Type)</td><td>@(t.IsAdaptive ? "✓" : "—")</td><td class="num">@t.ModuleCount</td><td class="num">@t.QuestionCount</td>
+                        <td><span class="badge @(t.Status == TestStatus.Published ? "ok" : t.Status == TestStatus.Draft ? "warn" : "")">@Labels.TestStatus(t.Status)</span></td><td class="num">@t.AttemptCount</td><td>@Tz.Fmt(t.UpdatedAt)</td>
+                        <td><a class="btn sm" href="/admin/tests/@t.Id">Ochish</a></td>
+                    </tr>
+                }</tbody></table></div>
+        }
+    </div>
+
+    <Modal Open="createOpen" OpenChanged="v => createOpen = v" Title="Yangi test">
+        <label class="lbl">Nomi</label><input class="input" @bind="title" placeholder="SAT Mock Test #2" />
+        <label class="lbl">Tavsif</label><input class="input" @bind="description" />
+        <label class="lbl">Tur</label>
+        <select class="input" @bind="type">@foreach (var t in Enum.GetValues<TestType>()) { <option value="@t">@Labels.TestType(t)</option> }</select>
+        @if (type is TestType.SectionTest or TestType.ModuleTest or TestType.TopicTest) { <label class="lbl">Bo'lim</label><select class="input" @bind="section"><option value="0">Reading & Writing</option><option value="1">Math</option></select> }
+        @if (type is TestType.Diagnostic or TestType.FullMock or TestType.SectionTest) { <label class="check mt"><input type="checkbox" @bind="adaptive" /> Adaptiv (Module 1 natijasiga ko'ra Module 2 Easy/Hard)</label> }
+        @if (type is TestType.ModuleTest or TestType.TopicTest) { <label class="lbl">Vaqt (daqiqa)</label><input class="input" type="number" min="1" max="180" @bind="minutes" /> }
+        @if (Error is not null) { <div class="error">@Error</div> }
+        <div class="modal-actions"><button class="btn" @onclick="() => createOpen = false">Bekor</button><button class="btn primary" @onclick="CreateAsync" disabled="@busy">Yaratish</button></div>
+    </Modal>
+}
+
+@code {
+    private List<TestRow> tests = [];
+    private TestStatus? status;
+    private bool createOpen, adaptive = true, busy;
+    private string title = "", description = "";
+    private TestType type = TestType.FullMock;
+    private int section = 1, minutes = 20;
+
+    protected override async Task OnInitializedAsync() { SetTitle("Testlar"); await LoadAsync(); Loading = false; }
+    private async Task LoadAsync() => tests = await Builder.ListAsync(status);
+    private void Set(TestStatus? s) { status = s; _ = LoadAsync().ContinueWith(_ => InvokeAsync(StateHasChanged)); }
+
+    private async Task CreateAsync()
+    {
+        busy = true; Error = null;
+        try
+        {
+            var id = await Builder.CreateAsync(title, type, adaptive, (Section)section, description, await Me.IdAsync(), type is TestType.ModuleTest or TestType.TopicTest ? minutes * 60 : null);
+            Nav.NavigateTo($"/admin/tests/{id}");
+        }
+        catch (AppException ex) { Error = ex.Message; busy = false; }
+    }
+}

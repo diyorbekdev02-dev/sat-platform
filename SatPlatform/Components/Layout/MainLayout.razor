@@ -1,0 +1,124 @@
+@inherits LayoutComponentBase
+@inject CurrentUser Me
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@inject NotificationService Notifications
+@inject SettingsService Settings
+@inject ToastService Toasts
+@inject PracticeService Practice
+@inject PageTitleState PageTitleState
+@implements IDisposable
+
+<div class="shell">
+    <aside class="sidebar @(menuOpen ? "open" : "")">
+        <div class="brand">
+            <div class="brand-mark">SAT</div>
+            <div>
+                <div class="brand-name">@centerName</div>
+                <div class="brand-sub">@roleLabel</div>
+            </div>
+        </div>
+        <nav class="nav">
+            @foreach (var item in Items)
+            {
+                if (item.Section is not null) { <div class="nav-section">@item.Section</div> continue; }
+                <NavLink href="@item.Href" Match="@(item.Href is "/dashboard" or "/teacher" or "/admin" or "/parent" ? NavLinkMatch.All : NavLinkMatch.Prefix)" @onclick="() => menuOpen = false">
+                    <Icon Name="@item.Icon" /> <span>@item.Text</span>
+                    @if (item.Href == "/mistakes" && mistakes > 0) { <span class="badge danger">@mistakes</span> }
+                </NavLink>
+            }
+        </nav>
+        <div class="sidebar-foot">
+            <div class="avatar" style="background:@avatarColor">@initials</div>
+            <div style="min-width:0;flex:1">
+                <div class="user-name">@name</div>
+                <div class="user-role">@roleLabel</div>
+            </div>
+            <a class="icon-btn" href="/auth/signout" title="Chiqish"><Icon Name="log-out" /></a>
+        </div>
+    </aside>
+    <div class="backdrop @(menuOpen ? "show" : "")" @onclick="() => menuOpen = false"></div>
+
+    <div class="main">
+        <header class="topbar">
+            <button class="icon-btn menu-btn" @onclick="() => menuOpen = !menuOpen" aria-label="Menyu"><Icon Name="menu" Size="22" /></button>
+            <h1 id="page-title">@Title</h1>
+            <div class="spacer"></div>
+            <button class="icon-btn" @onclick="ToggleTheme" title="Mavzu"><Icon Name="@(dark ? "sun" : "moon")" Size="20" /></button>
+            <a class="icon-btn" href="/notifications" title="Bildirishnomalar"><Icon Name="bell" Size="20" />@if (unread > 0) { <span class="dot">@unread</span> }</a>
+        </header>
+        <main class="content @ContentClass">
+            @Body
+        </main>
+    </div>
+</div>
+
+<div class="toast-host">
+    @foreach (var t in Toasts.Items) { <div class="toast @t.Kind">@t.Text</div> }
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Kutilmagan xatolik yuz berdi.
+    <a href="." class="reload">Qayta yuklash</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private bool menuOpen, dark;
+    private string name = "", roleLabel = "", initials = "", avatarColor = "#2f5bea", centerName = "SAT Center";
+    private int unread, mistakes;
+    private UserRole? role;
+    private string Title => PageTitleState.Current;
+    private string ContentClass => PageTitleState.Narrow ? "narrow" : "";
+
+    private record NavItem(string Href, string Text, string Icon, string? Section = null);
+    private List<NavItem> Items = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        Toasts.Changed += OnToast;
+        PageTitleState.Changed += OnTitle;
+        role = await Me.RoleAsync();
+        name = await Me.NameAsync();
+        initials = string.Concat(name.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(p => char.ToUpperInvariant(p[0])));
+        avatarColor = AuthService.ColorFor(name);
+        roleLabel = role is UserRole r ? Labels.Role(r) : "";
+        centerName = await Settings.GetAsync(SettingKeys.CenterName);
+        Items = role switch
+        {
+            UserRole.Student =>
+            [
+                new("/dashboard", "Bosh sahifa", "home"), new("/tests", "Testlar", "tests"), new("/practice", "Mashq", "target"), new("/mistakes", "Xatolarim", "x-circle"),
+                new("/analytics", "Tahlil", "chart"), new("/materials", "Materiallar", "book"), new("/homework", "Uy vazifasi", "clipboard"), new("/profile", "Profil", "user")
+            ],
+            UserRole.Teacher or UserRole.Assistant =>
+            [
+                new("/teacher", "Bosh sahifa", "home"), new("/teacher/groups", "Guruhlar", "users"), new("/teacher/students", "O'quvchilar", "user"), new("/teacher/attendance", "Davomat", "calendar"),
+                new("/teacher/assign", "Test tayinlash", "tests"), new("/teacher/homework", "Uy vazifalari", "clipboard"), new("/teacher/analytics", "Tahlil", "chart"), new("/materials", "Materiallar", "book"),
+                new("", "", "", "Kontent"), new("/admin/questions", "Savollar banki", "database"), new("/profile", "Profil", "user")
+            ],
+            UserRole.Parent => [new("/parent", "Farzandim", "home"), new("/parent/tests", "Testlar", "tests"), new("/parent/attendance", "Davomat", "calendar"), new("/profile", "Profil", "user")],
+            _ =>
+            [
+                new("/admin", "Bosh sahifa", "home"),
+                new("", "", "", "Kontent"), new("/admin/questions", "Savollar banki", "database"), new("/admin/tests", "Testlar", "tests"), new("/admin/materials", "Materiallar", "book"),
+                new("", "", "", "O'quv markaz"), new("/admin/students", "O'quvchilar", "user"), new("/admin/users", "Xodimlar va ota-onalar", "users"), new("/admin/groups", "Guruhlar", "layers"),
+                new("/teacher/attendance", "Davomat", "calendar"), new("/teacher/homework", "Uy vazifalari", "clipboard"), new("/teacher/assign", "Test tayinlash", "send"),
+                new("", "", "", "Tahlil va sozlamalar"), new("/admin/analytics", "Tahlil", "chart"), new("/admin/settings", "Sozlamalar", "settings"), new("/admin/audit", "Audit jurnali", "shield"), new("/profile", "Profil", "user")
+            ]
+        };
+        var uid = await Me.IdAsync();
+        unread = await Notifications.UnreadCountAsync(uid);
+        if (role == UserRole.Student && await Me.StudentIdAsync() is int sid) mistakes = await Practice.UnresolvedMistakeCountAsync(sid);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first) { dark = await JS.InvokeAsync<string>("sat.theme.get") == "dark"; await JS.InvokeVoidAsync("sat.ready"); StateHasChanged(); }
+    }
+
+    private async Task ToggleTheme() { dark = !dark; await JS.InvokeVoidAsync("sat.theme.set", dark ? "dark" : ""); }
+    private void OnToast() => InvokeAsync(StateHasChanged);
+    private void OnTitle() => InvokeAsync(StateHasChanged);
+    public void Dispose() { Toasts.Changed -= OnToast; PageTitleState.Changed -= OnTitle; }
+}

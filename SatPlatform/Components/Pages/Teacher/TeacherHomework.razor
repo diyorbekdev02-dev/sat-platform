@@ -1,0 +1,41 @@
+@page "/teacher/homework"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+@inject HomeworkService HomeworkSvc
+
+<PageTitle>Uy vazifalari</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="row between mb"><div class="muted small">@list.Count ta vazifa</div><a class="btn primary" href="/teacher/homework/new"><Icon Name="plus" /> Yangi vazifa</a></div>
+    <div class="card pad-0">
+        @if (list.Count == 0) { <div class="empty"><div class="big">📋</div><h3>Uy vazifalari yo'q</h3></div> }
+        else
+        {
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th>Vazifa</th><th>Kimga</th><th>Tur</th><th>Muddat</th><th class="num">Topshirdi</th><th class="num">Tekshirildi</th><th></th></tr></thead>
+                <tbody>@foreach (var h in list)
+                {
+                    <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/homework/{h.Homework.Id}"))">
+                        <td class="bold">@h.Homework.Title<div class="tiny muted">@h.Homework.CreatedByUser.FullName</div></td><td>@(h.Homework.Group?.Name ?? h.Homework.Student?.User.FullName)</td>
+                        <td><span class="badge">@(h.Homework.Kind == HomeworkKind.Practice ? $"Mashq · {h.Homework.QuestionCount}" : h.Homework.Kind == HomeworkKind.Test ? "Test" : "Fayl")</span></td>
+                        <td class="@(h.Homework.Deadline < DateTime.UtcNow ? "level-weak" : "")">@Tz.Fmt(h.Homework.Deadline)</td><td class="num">@h.Submitted / @h.Total</td><td class="num">@h.Reviewed</td>
+                        <td><a class="btn sm" href="/teacher/homework/@h.Homework.Id">Ochish</a></td>
+                    </tr>
+                }</tbody></table></div>
+        }
+    </div>
+}
+
+@code {
+    private List<HomeworkRow> list = [];
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Uy vazifalari");
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        list = await HomeworkSvc.ForStaffAsync(uid, role, await Academy.GroupScopeAsync(uid, role));
+        Loading = false;
+    }
+}

@@ -1,0 +1,71 @@
+@* Question-by-question review of a completed attempt. *@
+@inject IJSRuntime JS
+
+@if (Questions.Count == 0)
+{
+    <div class="empty"><h3>Savollar topilmadi</h3></div>
+}
+else
+{
+    <div class="card mb">
+        <div class="row between">
+            <div class="chips">
+                <button class="chip @(filter == "all" ? "active" : "")" @onclick="@(() => filter = "all")">Hammasi (@Questions.Count)</button>
+                <button class="chip @(filter == "wrong" ? "active" : "")" @onclick="@(() => filter = "wrong")">Xato (@Questions.Count(q => q.IsCorrect != true))</button>
+                <button class="chip @(filter == "flagged" ? "active" : "")" @onclick="@(() => filter = "flagged")">Belgilangan (@Questions.Count(q => q.IsFlagged))</button>
+            </div>
+            <div class="qgrid">
+                @foreach (var q in Questions)
+                {
+                    <button class="qcell @(q.IsCorrect == true ? "correct" : "wrong") @(q.IsFlagged ? "flagged" : "") @(current?.Id == q.Id ? "current" : "")" @onclick="() => current = q" title="@q.Question.Skill.Name">@(Questions.IndexOf(q) + 1)</button>
+                }
+            </div>
+        </div>
+    </div>
+    @if (current is not null)
+    {
+        var idx = Questions.IndexOf(current);
+        <div class="card">
+            <div class="row between mb">
+                <div class="row">
+                    <span class="q-number"><span class="n">@(idx + 1)</span></span>
+                    <span class="badge @(current.Module.Section == Section.RW ? "rw" : "math")">@Labels.SectionShort(current.Module.Section) · M@(current.Module.ModuleNumber)</span>
+                    <span class="badge">@current.Question.Skill.Name</span>
+                    <span class="badge">@Labels.Difficulty(current.Question.Difficulty)</span>
+                    <span class="badge @(current.IsCorrect == true ? "ok" : "danger")">@(current.IsCorrect == true ? "To'g'ri" : current.Answer is null ? "Javobsiz" : "Noto'g'ri")</span>
+                    <span class="badge"><Icon Name="clock" Size="14" /> @current.TimeSpentSeconds s</span>
+                    @if (current.IsFlagged) { <span class="badge warn"><Icon Name="flag" Size="14" /> belgilangan</span> }
+                </div>
+                <div class="row">
+                    <button class="btn sm" @onclick="() => Move(-1)" disabled="@(idx == 0)"><Icon Name="arrow-left" /> Oldingi</button>
+                    <button class="btn sm" @onclick="() => Move(1)" disabled="@(idx == Questions.Count - 1)">Keyingi <Icon Name="arrow-right" /></button>
+                </div>
+            </div>
+            <QuestionView Version="current.QuestionVersion" Mode="QuestionView.QuestionMode.Review" Answer="@current.Answer" IsCorrect="current.IsCorrect" />
+            @if (current.IsCorrect != true && PracticeLink)
+            {
+                <a class="btn mt" href="/practice/new?skill=@current.Question.SkillId"><Icon Name="target" /> Shu skillni mashq qilish</a>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public List<AttemptQuestion> Questions { get; set; } = [];
+    [Parameter] public bool PracticeLink { get; set; } = true;
+    private AttemptQuestion? current;
+    private string filter = "all";
+    private List<AttemptQuestion> Filtered => filter switch { "wrong" => Questions.Where(q => q.IsCorrect != true).ToList(), "flagged" => Questions.Where(q => q.IsFlagged).ToList(), _ => Questions };
+
+    protected override void OnParametersSet() { current ??= Questions.FirstOrDefault(); }
+
+    private void Move(int delta)
+    {
+        if (current is null) return;
+        var list = Filtered.Count > 0 ? Filtered : Questions;
+        var i = list.IndexOf(current);
+        if (i < 0) { current = list.FirstOrDefault(); return; }
+        var j = Math.Clamp(i + delta, 0, list.Count - 1);
+        current = list[j];
+    }
+}

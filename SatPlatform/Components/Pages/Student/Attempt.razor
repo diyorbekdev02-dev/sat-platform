@@ -1,0 +1,432 @@
+@page "/attempt/{AttemptId:int}"
+@attribute [Authorize]
+@layout EmptyLayout
+@inherits AppPage
+@inject TestEngineService Engine
+@inject AcademyService Academy
+@implements IAsyncDisposable
+
+<PageTitle>Test</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span> Test yuklanmoqda...</div> }
+else if (state is null)
+{
+    <div class="center-box"><div class="card"><div class="empty"><div class="big">🔒</div><h3>@(Error ?? "Test topilmadi")</h3><a class="btn mt" href="/tests">Testlarga qaytish</a></div></div></div>
+}
+else if (lockedOut)
+{
+    <div class="center-box"><div class="card"><div class="empty"><div class="big">🪟</div><h3>Bu test boshqa oynada ochiq</h3><p>Faol test oynasiga qayting. Agar u oyna yopilgan bo'lsa, 20 soniyadan so'ng shu yerda davom ettirishingiz mumkin.</p><button class="btn primary mt" @onclick="RefreshAsync">Qayta tekshirish</button></div></div></div>
+}
+else if (state.Attempt.Status is AttemptStatus.Completed or AttemptStatus.Scoring or AttemptStatus.AutoSubmitted)
+{
+    <div class="center-box"><div class="card"><div class="empty"><div class="big">🎉</div><h3>Test yakunlandi</h3><p>Natija hisoblandi.</p>
+        @if (state.Attempt.IsPreview) { <a class="btn primary mt" href="/admin/tests/@state.Attempt.TestId">Test builderga qaytish</a> } else { <a class="btn primary mt" href="/attempt/@AttemptId/result">Natijani ko'rish</a> }
+    </div></div></div>
+}
+else if (state.Attempt.Status == AttemptStatus.Abandoned)
+{
+    <div class="center-box"><div class="card"><div class="empty"><h3>Bu urinish bekor qilingan</h3><a class="btn mt" href="/tests">Testlarga qaytish</a></div></div></div>
+}
+else if (state.Attempt.Status == AttemptStatus.Break)
+{
+    <div class="test-shell">
+        <div class="break-screen">
+            <h1>TANAFFUS</h1>
+            <div class="big timer" id="timer">@Labels.Time(state.BreakSecondsLeft)</div>
+            <p class="muted mt">Qisqa dam oling. Tanaffus tugagach Math bo'limi boshlanadi.</p>
+            <button class="btn primary lg mt" @onclick="ResumeAsync">Tanaffusni tugatish va davom etish</button>
+        </div>
+    </div>
+}
+else if (state.CurrentModule is not null)
+{
+    var m = state.CurrentModule;
+    var q = Current;
+    <div class="test-shell">
+        <header class="test-header">
+            <div>
+                <div class="title">@Labels.Section(m.Section) — Module @m.ModuleNumber of @ModuleCount(m.Section)</div>
+                <div class="sub">@state.Attempt.Test.Title @(state.Attempt.IsPreview ? "· PREVIEW" : "")</div>
+            </div>
+            <div class="spacer"></div>
+            <div class="timer @(hideTimer ? "hidden-time" : "")" id="timer" title="Qolgan vaqt">@(hideTimer ? "⏱" : Labels.Time(state.SecondsLeft))</div>
+            <button class="icon-btn" title="Taymerni yashirish/ko'rsatish" @onclick="() => hideTimer = !hideTimer"><Icon Name="@(hideTimer ? "eye" : "eye-off")" /></button>
+            <div style="position:relative">
+                <button class="btn sm" @onclick="() => toolsOpen = !toolsOpen"><Icon Name="tool" /> Tools <Icon Name="chevron-down" Size="14" /></button>
+                @if (toolsOpen)
+                {
+                    <div class="tools-menu">
+                        @if (m.Section == Section.Math) { <button @onclick="@(() => OpenTool("calc"))"><Icon Name="calculator" /> Kalkulyator</button><button @onclick="@(() => OpenTool("ref"))"><Icon Name="book" /> Reference Sheet</button> }
+                        else { <button @onclick="Highlight"><Icon Name="pencil" /> Belgilangan matnni bo'yash</button><button @onclick="ClearHighlights"><Icon Name="x" /> Bo'yashni tozalash</button> }
+                        <button @onclick="ToggleLineReader"><Icon Name="list" /> Line Reader @(lineReader ? "(yoq.)" : "")</button>
+                        <button @onclick="@(() => OpenTool("help"))"><Icon Name="info" /> Klaviatura tugmalari</button>
+                        <button style="color:var(--danger)" @onclick="AbandonAsync"><Icon Name="x-circle" /> Testdan chiqish (bekor qilish)</button>
+                    </div>
+                }
+            </div>
+        </header>
+
+        @if (q is not null)
+        {
+            var hasPassage = !string.IsNullOrWhiteSpace(q.QuestionVersion.Passage);
+            <div class="test-body @(hasPassage ? "" : "single")">
+                @if (hasPassage)
+                {
+                    <div class="panel passage" id="passage-panel"><div class="q-content" id="passage-content">@((MarkupString)q.QuestionVersion.Passage!)</div></div>
+                }
+                <div class="panel question" id="question-panel">
+                    <div class="row between mb-s">
+                        <div class="q-number"><span class="n">@(index + 1)</span><span class="small muted">/ @state.CurrentQuestions.Count</span></div>
+                        <button class="flag-btn @(q.IsFlagged ? "on" : "")" @onclick="ToggleFlag"><Icon Name="flag" Size="15" /> @(q.IsFlagged ? "Belgilangan" : "Belgilash")</button>
+                    </div>
+                    <QuestionView @key="q.Id" Version="q.QuestionVersion" Mode="QuestionView.QuestionMode.Test" Answer="@q.Answer" EliminatedText="@(q.EliminatedOptions ?? "")" ShowPassageInline="false" OnAnswer="AnswerAsync" OnEliminate="EliminateAsync" />
+                    @if (saveError is not null) { <div class="alert danger mt">@saveError</div> }
+                    @if (q.QuestionVersion.Type == QuestionType.MultipleChoice) { <div class="strike-hint">Variantni chizib tashlash uchun o'ng tomondagi harfni bosing. Klaviatura: A/B/C/D, ← →, F — belgilash.</div> }
+                </div>
+            </div>
+        }
+
+        <footer class="test-footer">
+            <button class="btn" @onclick="() => Go(index - 1)" disabled="@(index == 0)"><Icon Name="arrow-left" /> Back</button>
+            <div class="spacer"></div>
+            <button class="btn" @onclick="() => gridOpen = !gridOpen"><Icon Name="grid" /> Question @(index + 1) of @state.CurrentQuestions.Count <Icon Name="chevron-up" Size="14" /></button>
+            <div class="spacer"></div>
+            @if (index < state.CurrentQuestions.Count - 1) { <button class="btn primary" @onclick="() => Go(index + 1)">Next <Icon Name="arrow-right" /></button> }
+            else { <button class="btn primary" @onclick="() => reviewOpen = true">Review <Icon Name="arrow-right" /></button> }
+        </footer>
+
+        @if (gridOpen)
+        {
+            <div class="qgrid-popover">
+                <div class="row between mb-s"><b>Savollar</b><button class="icon-btn" @onclick="() => gridOpen = false"><Icon Name="x" /></button></div>
+                <div class="qgrid">
+                    @for (var i = 0; i < state.CurrentQuestions.Count; i++)
+                    {
+                        var qq = state.CurrentQuestions[i]; var ii = i;
+                        <button class="qcell @(qq.Answer is not null ? "answered" : "") @(qq.IsFlagged ? "flagged" : "") @(ii == index ? "current" : "")" @onclick="() => { Go(ii); gridOpen = false; }">@(i + 1)</button>
+                    }
+                </div>
+                <div class="legend mt-s"><span><i style="background:var(--accent-soft);border:1px solid var(--accent)"></i>Javob berilgan</span><span><i style="background:var(--bg);border:1px solid var(--border)"></i>Javobsiz</span><span><i style="background:var(--warn)"></i>Belgilangan</span></div>
+                <button class="btn sm full mt-s" @onclick="() => { gridOpen = false; reviewOpen = true; }">Modulni yakunlash (Review)</button>
+            </div>
+        }
+
+        @if (reviewOpen)
+        {
+            var answered = state.CurrentQuestions.Count(x => x.Answer is not null);
+            var unanswered = state.CurrentQuestions.Where(x => x.Answer is null).ToList();
+            var flagged = state.CurrentQuestions.Where(x => x.IsFlagged).ToList();
+            <div class="modal-backdrop" @onclick="() => reviewOpen = false">
+                <div class="modal" @onclick:stopPropagation="true">
+                    <h2>Module Review</h2>
+                    <dl class="kv"><dt>Javob berilgan</dt><dd class="bold">@answered / @state.CurrentQuestions.Count</dd><dt>Javobsiz</dt><dd class="bold @(unanswered.Count > 0 ? "level-weak" : "")">@unanswered.Count</dd><dt>Belgilangan</dt><dd class="bold">@flagged.Count</dd></dl>
+                    @if (unanswered.Count > 0)
+                    {
+                        <div class="lbl">Javobsiz savollar</div>
+                        <div class="review-list">@foreach (var x in unanswered) { var ix = state.CurrentQuestions.IndexOf(x); <button class="qcell" @onclick="() => { Go(ix); reviewOpen = false; }">@(ix + 1)</button> }</div>
+                    }
+                    @if (flagged.Count > 0)
+                    {
+                        <div class="lbl">Belgilangan savollar</div>
+                        <div class="review-list">@foreach (var x in flagged) { var ix = state.CurrentQuestions.IndexOf(x); <button class="qcell flagged @(x.Answer is not null ? "answered" : "")" @onclick="() => { Go(ix); reviewOpen = false; }">@(ix + 1)</button> }</div>
+                    }
+                    <div class="alert warn mt">Modulni yakunlagach unga qaytib bo'lmaydi.</div>
+                    <div class="modal-actions">
+                        <button class="btn" @onclick="() => reviewOpen = false">Savollarga qaytish</button>
+                        <button class="btn primary" @onclick="FinishModuleAsync" disabled="@busy">Modulni yakunlash</button>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (tool == "calc")
+        {
+            <div class="tool-panel"><div class="head"><span>Kalkulyator</span><button class="icon-btn" @onclick="@(() => tool = null)"><Icon Name="x" /></button></div>
+                <div class="calc">
+                    <div class="display">@(calcDisplay.Length == 0 ? "0" : calcDisplay)</div>
+                    <div class="keys">
+                        @foreach (var k in new[] { "(", ")", "C", "⌫", "÷", "7", "8", "9", "^", "×", "4", "5", "6", "√", "−", "1", "2", "3", "π", "+", "0", ".", "%", "=", "" })
+                        {
+                            if (k == "") { continue; }
+                            var key = k;
+                            <button class="@(key == "=" ? "eq" : "+−×÷^√%()".Contains(key) ? "op" : "")" @onclick="() => CalcKey(key)">@key</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+        else if (tool == "ref")
+        {
+            <div class="tool-panel" style="width:360px"><div class="head"><span>Reference Sheet</span><button class="icon-btn" @onclick="@(() => tool = null)"><Icon Name="x" /></button></div>
+                <div class="reference" id="ref-sheet">
+                    <h4>Doira</h4>$A = \pi r^2$, $C = 2\pi r$
+                    <h4>To'g'ri to'rtburchak</h4>$A = lw$
+                    <h4>Uchburchak</h4>$A = \frac{1}{2}bh$; to'g'ri burchakli: $a^2 + b^2 = c^2$; maxsus: $30°$–$60°$–$90°$ → $x, x\sqrt{3}, 2x$; $45°$–$45°$–$90°$ → $s, s, s\sqrt{2}$
+                    <h4>Hajm</h4>Parallelepiped $V = lwh$; silindr $V = \pi r^2 h$; shar $V = \frac{4}{3}\pi r^3$; konus $V = \frac{1}{3}\pi r^2 h$; piramida $V = \frac{1}{3}lwh$
+                    <h4>Boshqa</h4>Aylana gradusi $360°$; radianda $2\pi$; uchburchak burchaklari yig'indisi $180°$
+                </div>
+            </div>
+        }
+        else if (tool == "help")
+        {
+            <div class="tool-panel"><div class="head"><span>Klaviatura</span><button class="icon-btn" @onclick="@(() => tool = null)"><Icon Name="x" /></button></div>
+                <div class="reference"><b>→</b> keyingi savol · <b>←</b> oldingi savol<br /><b>A B C D</b> yoki <b>1 2 3 4</b> — variantni tanlash<br /><b>F</b> — belgilash · <b>G</b> — savollar jadvali</div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public int AttemptId { get; set; }
+    private AttemptState? state;
+    private int index;
+    private bool lockedOut, busy, hideTimer, toolsOpen, gridOpen, reviewOpen, lineReader;
+    private string? tool, saveError;
+    private string calcDisplay = "";
+    private int? studentId;
+    private bool staff;
+    private readonly string circuitId = Guid.NewGuid().ToString("N");
+    private DotNetObjectReference<Attempt>? self;
+    private System.Threading.Timer? heartbeat;
+    private DateTime questionShownAt = DateTime.UtcNow;
+    private int lastTimerModule = -1;
+    private bool timerStarted;
+
+    private AttemptQuestion? Current => state is null || state.CurrentQuestions.Count == 0 ? null : state.CurrentQuestions[Math.Clamp(index, 0, state.CurrentQuestions.Count - 1)];
+    private int ModuleCount(Section s) => state?.Attempt.Modules.Count(m => m.Section == s) ?? 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        studentId = await Me.StudentIdAsync();
+        staff = await Me.IsStaffAsync();
+        await RefreshAsync();
+        Loading = false;
+    }
+
+    private async Task RefreshAsync()
+    {
+        state = await Engine.StateAsync(AttemptId, studentId, allowStaff: staff);
+        if (state is null) { Error = "Test topilmadi yoki sizga tegishli emas."; return; }
+        if (staff && !state.Attempt.IsPreview && state.Attempt.StudentId != studentId) { state = null; Error = "Bu urinish boshqa o'quvchiga tegishli."; return; }
+        lockedOut = !Engine.TryAcquireSession(AttemptId, circuitId);
+        if (lockedOut) return;
+        // resume at the first unanswered question of the current module
+        if (state.CurrentQuestions.Count > 0 && index >= state.CurrentQuestions.Count) index = 0;
+        var firstUnanswered = state.CurrentQuestions.FindIndex(q => q.Answer is null);
+        if (lastTimerModule != state.CurrentModule?.Order) { index = firstUnanswered < 0 ? 0 : firstUnanswered; timerStarted = false; }
+        questionShownAt = DateTime.UtcNow;
+        await SyncLocalBackupAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first)
+        {
+            self = DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("sat.setKeyHandler", self);
+            await JS.InvokeVoidAsync("sat.setLeaveGuard", true);
+            heartbeat = new System.Threading.Timer(_ => Engine.Heartbeat(AttemptId, circuitId), null, 5000, 5000);
+        }
+        if (state is null || lockedOut) return;
+        if (state.Attempt.Status == AttemptStatus.Break)
+        {
+            if (!timerStarted || lastTimerModule != -2) { lastTimerModule = -2; timerStarted = true; await JS.InvokeVoidAsync("sat.startTimer", "timer", state.BreakSecondsLeft, self); }
+        }
+        else if (state.CurrentModule is not null && state.Attempt.Status == AttemptStatus.InProgress)
+        {
+            if (!timerStarted || lastTimerModule != state.CurrentModule.Order)
+            {
+                lastTimerModule = state.CurrentModule.Order; timerStarted = true;
+                await JS.InvokeVoidAsync("sat.startTimer", "timer", state.SecondsLeft, self);
+            }
+            try { await JS.InvokeVoidAsync("sat.renderMath", "passage-content"); await JS.InvokeVoidAsync("sat.renderMath", "ref-sheet"); } catch { }
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnTimerExpired()
+    {
+        await Task.Delay(1500);
+        await RefreshAsync();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task OnKey(string cmd)
+    {
+        if (state is null || lockedOut || reviewOpen || state.Attempt.Status != AttemptStatus.InProgress) return;
+        switch (cmd)
+        {
+            case "next": if (index < state.CurrentQuestions.Count - 1) Go(index + 1); else reviewOpen = true; break;
+            case "back": if (index > 0) Go(index - 1); break;
+            case "flag": await ToggleFlag(); break;
+            case "grid": gridOpen = !gridOpen; break;
+            case "A" or "B" or "C" or "D":
+                if (Current?.QuestionVersion.Type == QuestionType.MultipleChoice) await AnswerAsync(Current.Answer == cmd ? null : cmd);
+                break;
+        }
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void Go(int i)
+    {
+        if (state is null) return;
+        _ = RecordTimeAsync();
+        index = Math.Clamp(i, 0, state.CurrentQuestions.Count - 1);
+        questionShownAt = DateTime.UtcNow;
+        _ = JS.InvokeVoidAsync("sat.scrollTop", "question-panel").AsTask();
+    }
+
+    private int TakeElapsed()
+    {
+        var s = (int)(DateTime.UtcNow - questionShownAt).TotalSeconds;
+        questionShownAt = DateTime.UtcNow;
+        return s;
+    }
+
+    private async Task RecordTimeAsync()
+    {
+        var q = Current; if (q is null || studentId is null) return;
+        var s = TakeElapsed();
+        if (s > 0) { q.TimeSpentSeconds += s; await Engine.TimeAsync(AttemptId, StudentOrPreview(), q.Id, s); }
+    }
+
+    private int StudentOrPreview() => state!.Attempt.StudentId;
+
+    private async Task AnswerAsync(string? answer)
+    {
+        var q = Current; if (q is null || state is null) return;
+        saveError = null;
+        await JS.InvokeVoidAsync("sat.backup.save", AttemptId, q.Id, answer ?? "");
+        var elapsed = TakeElapsed();
+        var err = await Engine.AnswerAsync(AttemptId, StudentOrPreview(), q.Id, answer, elapsed);
+        if (err is not null)
+        {
+            if (err == "Vaqt tugadi." || err == "Bu modul yakunlangan.") { await RefreshAsync(); }
+            else saveError = err;
+            return;
+        }
+        q.Answer = answer; q.AnsweredAt = answer is null ? null : DateTime.UtcNow; q.TimeSpentSeconds += elapsed;
+        await JS.InvokeVoidAsync("sat.backup.clear", AttemptId, q.Id);
+    }
+
+    /// <summary>Answers saved locally while the connection was down are pushed to the server.</summary>
+    private async Task SyncLocalBackupAsync()
+    {
+        try
+        {
+            var pending = await JS.InvokeAsync<Dictionary<string, System.Text.Json.JsonElement>>("sat.backup.pending", AttemptId);
+            if (pending.Count == 0 || state is null) return;
+            foreach (var (key, val) in pending)
+            {
+                if (!int.TryParse(key, out var qid)) continue;
+                var q = state.CurrentQuestions.FirstOrDefault(x => x.Id == qid);
+                var a = val.TryGetProperty("a", out var ae) ? ae.GetString() : null;
+                if (q is not null && (q.Answer ?? "") != (a ?? ""))
+                {
+                    var err = await Engine.AnswerAsync(AttemptId, StudentOrPreview(), qid, string.IsNullOrEmpty(a) ? null : a, 0);
+                    if (err is null) { q.Answer = string.IsNullOrEmpty(a) ? null : a; }
+                }
+                await JS.InvokeVoidAsync("sat.backup.clear", AttemptId, qid);
+            }
+        }
+        catch { }
+    }
+
+    private async Task EliminateAsync(string eliminated)
+    {
+        var q = Current; if (q is null) return;
+        q.EliminatedOptions = eliminated;
+        await Engine.EliminateAsync(AttemptId, StudentOrPreview(), q.Id, eliminated);
+    }
+
+    private async Task ToggleFlag()
+    {
+        var q = Current; if (q is null) return;
+        q.IsFlagged = !q.IsFlagged;
+        await Engine.FlagAsync(AttemptId, StudentOrPreview(), q.Id, q.IsFlagged);
+    }
+
+    private async Task FinishModuleAsync()
+    {
+        busy = true; reviewOpen = false;
+        await RecordTimeAsync();
+        var err = await Engine.FinishModuleAsync(AttemptId, StudentOrPreview());
+        if (err is not null) Toasts.Error(err);
+        await JS.InvokeVoidAsync("sat.stopTimer", "timer");
+        await RefreshAsync();
+        busy = false;
+        if (state?.Attempt.Status is AttemptStatus.Completed or AttemptStatus.Scoring or AttemptStatus.AutoSubmitted) await JS.InvokeVoidAsync("sat.setLeaveGuard", false);
+    }
+
+    private async Task ResumeAsync()
+    {
+        await Engine.ResumeFromBreakAsync(AttemptId, StudentOrPreview());
+        await JS.InvokeVoidAsync("sat.stopTimer", "timer");
+        await RefreshAsync();
+    }
+
+    private void OpenTool(string t) { tool = tool == t ? null : t; toolsOpen = false; }
+
+    private async Task AbandonAsync()
+    {
+        toolsOpen = false;
+        if (!await ConfirmAsync("Testni bekor qilasizmi? Bu urinish natijasiz yakunlanadi va qayta boshlash urinishlar sonidan hisoblanadi.")) return;
+        await Engine.AbandonAsync(AttemptId, StudentOrPreview(), staff);
+        await JS.InvokeVoidAsync("sat.setLeaveGuard", false);
+        Nav.NavigateTo(state?.Attempt.IsPreview == true ? $"/admin/tests/{state.Attempt.TestId}" : "/tests");
+    }
+    private async Task Highlight() { toolsOpen = false; await JS.InvokeVoidAsync("sat.highlightSelection"); }
+    private async Task ClearHighlights() { toolsOpen = false; await JS.InvokeVoidAsync("sat.clearHighlights"); }
+    private async Task ToggleLineReader() { toolsOpen = false; lineReader = await JS.InvokeAsync<bool>("sat.toggleLineReader"); }
+
+    // ---- tiny calculator (basic four operations, power, root, percent, parentheses)
+    private void CalcKey(string k)
+    {
+        switch (k)
+        {
+            case "C": calcDisplay = ""; break;
+            case "⌫": if (calcDisplay.Length > 0) calcDisplay = calcDisplay[..^1]; break;
+            case "=": calcDisplay = Evaluate(calcDisplay); break;
+            case "π": calcDisplay += "π"; break;
+            default: calcDisplay += k; break;
+        }
+    }
+
+    private static string Evaluate(string expr)
+    {
+        try
+        {
+            var s = expr.Replace("×", "*").Replace("÷", "/").Replace("−", "-").Replace("π", Math.PI.ToString(System.Globalization.CultureInfo.InvariantCulture)).Replace("%", "/100");
+            var p = new Parser(s); var v = p.ParseExpression();
+            if (p.Pos < s.Length) return "Xato";
+            return Math.Round(v, 10).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+        catch { return "Xato"; }
+    }
+
+    private class Parser(string s)
+    {
+        public int Pos;
+        private char Peek => Pos < s.Length ? s[Pos] : '\0';
+        public double ParseExpression() { var v = ParseTerm(); while (Peek is '+' or '-') { var op = s[Pos++]; var r = ParseTerm(); v = op == '+' ? v + r : v - r; } return v; }
+        private double ParseTerm() { var v = ParseFactor(); while (Peek is '*' or '/') { var op = s[Pos++]; var r = ParseFactor(); v = op == '*' ? v * r : v / r; } return v; }
+        private double ParseFactor() { var v = ParseUnary(); while (Peek == '^') { Pos++; v = Math.Pow(v, ParseUnary()); } return v; }
+        private double ParseUnary()
+        {
+            if (Peek == '-') { Pos++; return -ParseUnary(); }
+            if (Peek == '√') { Pos++; return Math.Sqrt(ParseUnary()); }
+            if (Peek == '(') { Pos++; var v = ParseExpression(); if (Peek == ')') Pos++; return v; }
+            var start = Pos; while (char.IsDigit(Peek) || Peek == '.') Pos++;
+            return double.Parse(s[start..Pos], System.Globalization.CultureInfo.InvariantCulture);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        heartbeat?.Dispose();
+        Engine.ReleaseSession(AttemptId, circuitId);
+        try { await JS.InvokeVoidAsync("sat.setKeyHandler", null); await JS.InvokeVoidAsync("sat.setLeaveGuard", false); await JS.InvokeVoidAsync("sat.stopTimer", "timer"); if (lineReader) await JS.InvokeVoidAsync("sat.toggleLineReader"); } catch { }
+        self?.Dispose();
+    }
+}

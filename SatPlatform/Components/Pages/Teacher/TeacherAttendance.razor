@@ -1,0 +1,83 @@
+@page "/teacher/attendance"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+
+<PageTitle>Davomat</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="card mb">
+        <div class="form-row">
+            <div><label class="lbl">Guruh</label><select class="input" @bind="groupId" @bind:after="LoadAsync"><option value="0">— tanlang —</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select></div>
+            <div><label class="lbl">Sana</label><input class="input" type="date" @bind="date" @bind:after="LoadAsync" /></div>
+        </div>
+    </div>
+    @if (group is not null)
+    {
+        <div class="card">
+            <div class="row between mb"><div><h2>@group.Name</h2><div class="small muted">@date.ToString("dd.MM.yyyy") · @rows.Count o'quvchi @(AcademyService.HasClassOn(group, date) ? "" : "· ⚠ jadval bo'yicha bu kuni dars yo'q")</div></div><div class="row"><button class="btn sm" @onclick="() => SetAll(AttendanceStatus.Present)">Hammasi keldi</button></div></div>
+            @if (rows.Count == 0) { <div class="empty"><h3>Guruhda o'quvchi yo'q</h3></div> }
+            @foreach (var r in rows)
+            {
+                <div class="att-row">
+                    <div><b>@r.Name</b></div>
+                    <div class="att-btns">
+                        <button class="present @(r.Status == AttendanceStatus.Present ? "on" : "")" @onclick="() => r.Status = AttendanceStatus.Present">Keldi</button>
+                        <button class="absent @(r.Status == AttendanceStatus.Absent ? "on" : "")" @onclick="() => r.Status = AttendanceStatus.Absent">Kelmadi</button>
+                        <button class="late @(r.Status == AttendanceStatus.Late ? "on" : "")" @onclick="() => r.Status = AttendanceStatus.Late">Kechikdi</button>
+                        <button class="excused @(r.Status == AttendanceStatus.Excused ? "on" : "")" @onclick="() => r.Status = AttendanceStatus.Excused">Sababli</button>
+                    </div>
+                    <div>@if (r.Status == AttendanceStatus.Late) { <input class="input sm" type="number" min="1" max="180" style="width:90px" @bind="r.Late" placeholder="min" /> }</div>
+                </div>
+            }
+            <div class="row end mt"><button class="btn primary lg" @onclick="SaveAsync" disabled="@(busy || rows.Count == 0)"><Icon Name="check" /> Davomatni saqlash</button></div>
+            <p class="small muted mt-s">Kelmagan yoki kechikkan o'quvchilarning ota-onasiga Telegram orqali xabar yuboriladi.</p>
+        </div>
+    }
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "group")] public int? QGroup { get; set; }
+    private List<Group> groups = [];
+    private Group? group;
+    private int groupId;
+    private DateOnly date = Tz.Today;
+    private bool busy;
+    private class Row { public int StudentId; public string Name = ""; public AttendanceStatus Status = AttendanceStatus.Present; public int Late = 10; }
+    private List<Row> rows = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Davomat", narrow: true);
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        groups = await Academy.GroupsAsync(await Academy.GroupScopeAsync(uid, role));
+        groupId = QGroup ?? (groups.FirstOrDefault(g => AcademyService.HasClassOn(g, Tz.Today))?.Id ?? groups.FirstOrDefault()?.Id ?? 0);
+        await LoadAsync();
+        Loading = false;
+    }
+
+    private async Task LoadAsync()
+    {
+        group = groups.FirstOrDefault(g => g.Id == groupId);
+        if (group is null) { rows = []; return; }
+        var full = await Academy.GroupAsync(groupId);
+        var existing = await Academy.AttendanceAsync(groupId, date);
+        rows = full!.Enrollments.Where(e => e.Status == EnrollmentStatus.Active).OrderBy(e => e.Student.User.FullName).Select(e =>
+        {
+            var a = existing.FirstOrDefault(x => x.StudentId == e.StudentId);
+            return new Row { StudentId = e.StudentId, Name = e.Student.User.FullName, Status = a?.Status ?? AttendanceStatus.Present, Late = a?.LateMinutes is > 0 ? a.LateMinutes : 10 };
+        }).ToList();
+    }
+
+    private void SetAll(AttendanceStatus s) { foreach (var r in rows) r.Status = s; }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        await Academy.SaveAttendanceAsync(groupId, date, rows.Select(r => (r.StudentId, r.Status, r.Late)), await Me.IdAsync());
+        busy = false;
+        Toasts.Ok("Davomat saqlandi");
+    }
+}

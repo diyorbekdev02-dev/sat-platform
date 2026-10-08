@@ -1,0 +1,87 @@
+@page "/attempt/{AttemptId:int}/result"
+@attribute [Authorize]
+@inherits AppPage
+@inject TestEngineService Engine
+@inject AcademyService Academy
+@inject AnalyticsService Analytics
+
+<PageTitle>Test natijasi</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (a is null) { <div class="empty"><h3>Natija topilmadi</h3></div> }
+else if (a.Status != AttemptStatus.Completed) { <div class="card"><div class="empty"><h3>Test hali yakunlanmagan</h3><a class="btn primary mt" href="/attempt/@AttemptId">Davom ettirish</a></div></div> }
+else
+{
+    <div class="card" style="text-align:center;padding:32px">
+        <div class="muted small">TEST COMPLETE · @a.Test.Title · @Tz.Fmt(a.CompletedAt)</div>
+        @if (staffView) { <div class="small">O'quvchi: <b>@a.Student.User.FullName</b></div> }
+        @if (a.TotalScore is int total)
+        {
+            <div style="font-size:64px;font-weight:800;letter-spacing:-.03em;line-height:1.1;margin:10px 0">@total</div>
+            <div class="muted">SAT taxminiy ball</div>
+            <div class="grid c2 mt" style="max-width:420px;margin:16px auto 0">
+                <div class="stat"><div class="label">Reading & Writing</div><div class="value">@a.RwScore</div><div class="sub">@a.RwRaw / @a.RwMax to'g'ri · @(a.RwRoute == ModuleRoute.Hard ? "Hard" : a.RwRoute == ModuleRoute.Easy ? "Easy" : "Standard") route</div></div>
+                <div class="stat"><div class="label">Math</div><div class="value">@a.MathScore</div><div class="sub">@a.MathRaw / @a.MathMax to'g'ri · @(a.MathRoute == ModuleRoute.Hard ? "Hard" : a.MathRoute == ModuleRoute.Easy ? "Easy" : "Standard") route</div></div>
+            </div>
+            @if (previous is int p)
+            {
+                <div class="mt">Oldingi: <b>@p</b> · O'zgarish: <b class="@(total - p >= 0 ? "level-strong" : "level-weak")">@((total - p >= 0 ? "+" : "") + (total - p))</b></div>
+            }
+        }
+        else if (a.RwScore is int rw) { <div style="font-size:56px;font-weight:800">@rw</div><div class="muted">Reading & Writing ball · @a.RwRaw / @a.RwMax to'g'ri</div> }
+        else if (a.MathScore is int mt) { <div style="font-size:56px;font-weight:800">@mt</div><div class="muted">Math ball · @a.MathRaw / @a.MathMax to'g'ri</div> }
+        else
+        {
+            var correct = a.RwRaw + a.MathRaw; var max = a.RwMax + a.MathMax;
+            <div style="font-size:56px;font-weight:800">@correct / @max</div>
+            <div class="muted">to'g'ri javoblar · aniqlik @(max == 0 ? 0 : correct * 100 / max)%</div>
+        }
+        <div class="row mt" style="justify-content:center">
+            <a class="btn primary" href="/attempt/@AttemptId/review"><Icon Name="eye" /> Javoblarni ko'rish</a>
+            @if (!staffView) { <a class="btn" href="/analytics"><Icon Name="chart" /> Tahlil</a><a class="btn" href="/practice"><Icon Name="target" /> Mashq</a> }
+        </div>
+    </div>
+
+    @if (skills.Count > 0)
+    {
+        <div class="card mt">
+            <div class="card-title"><h2>Shu testdagi skilllar</h2></div>
+            <SkillBars Stats="skills" />
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public int AttemptId { get; set; }
+    private TestAttempt? a;
+    private int? previous;
+    private bool staffView;
+    private List<SkillStat> skills = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Test natijasi", narrow: true);
+        var sid = await Me.StudentIdAsync();
+        var role = await Me.RoleAsync();
+        var staff = role is UserRole.Admin or UserRole.SuperAdmin or UserRole.Teacher or UserRole.Assistant or UserRole.Parent;
+        a = await Engine.ResultAsync(AttemptId, sid, staff);
+        if (a is not null && staff)
+        {
+            var uid = await Me.IdAsync();
+            if (!await Academy.CanSeeStudentAsync(uid, role!.Value, a.StudentId)) a = null;
+            staffView = true;
+        }
+        if (a is not null && a.Status == AttemptStatus.Completed)
+        {
+            previous = await Engine.PreviousTotalAsync(a.StudentId, a.Id, a.CompletedAt ?? DateTime.UtcNow);
+            var (weak, strong, _) = await Analytics.ThresholdsAsync();
+            var review = await Engine.ReviewAsync(AttemptId, sid, staff);
+            skills = review.GroupBy(q => q.Question.Skill).Select(g =>
+            {
+                var acc = g.Count(q => q.IsCorrect == true) * 100.0 / g.Count();
+                return new SkillStat(g.Key.Id, g.Key.Name, g.Key.Domain.Name, g.Key.Domain.Section, g.Count(), g.Count(q => q.IsCorrect == true), Math.Round(acc), Math.Round(g.Average(q => q.TimeSpentSeconds)), acc < weak ? "weak" : acc > strong ? "strong" : "medium");
+            }).OrderBy(s => s.Section).ThenBy(s => s.Accuracy).ToList();
+        }
+        Loading = false;
+    }
+}

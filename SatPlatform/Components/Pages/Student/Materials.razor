@@ -1,0 +1,55 @@
+@page "/materials"
+@attribute [Authorize]
+@inherits AppPage
+@inject MaterialService MaterialsSvc
+@inject AcademyService Academy
+
+<PageTitle>Materiallar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="chips mb">
+        <button class="chip @(category is null ? "active" : "")" @onclick="() => Set(null)">Hammasi</button>
+        @foreach (var c in Enum.GetValues<MaterialCategory>()) { <button class="chip @(category == c ? "active" : "")" @onclick="() => Set(c)">@Labels.Material(c)</button> }
+    </div>
+    @if (list.Count == 0) { <div class="card"><div class="empty"><div class="big">📚</div><h3>Materiallar yo'q</h3><p class="small">Bu bo'limda hali material qo'shilmagan.</p></div></div> }
+    else
+    {
+        <div class="grid c2">
+            @foreach (var m in list)
+            {
+                <div class="card">
+                    <div class="row between"><h2>@m.Title</h2><span class="badge">@Labels.Material(m.Category)</span></div>
+                    @if (!string.IsNullOrWhiteSpace(m.Description)) { <p class="small muted mt-s" style="white-space:pre-line">@m.Description</p> }
+                    <div class="row mt-s">
+                        @if (m.File is not null) { <a class="btn sm" href="/files/@m.File.Id" target="_blank"><Icon Name="download" /> @m.File.OriginalName <span class="muted">(@(m.File.Size / 1024) KB)</span></a> }
+                        @if (!string.IsNullOrWhiteSpace(m.ExternalUrl)) { <a class="btn sm" href="@m.ExternalUrl" target="_blank"><Icon Name="external" /> Havolani ochish</a> }
+                        <span class="small muted">@Tz.FmtDate(m.CreatedAt)</span>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    private MaterialCategory? category;
+    private List<Material> list = [];
+    private List<int>? groups;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Materiallar");
+        var role = await Me.RoleAsync();
+        if (role == UserRole.Student && await Me.StudentIdAsync() is int sid)
+        {
+            var student = await Academy.StudentAsync(sid);
+            groups = student?.Enrollments.Where(e => e.Status == EnrollmentStatus.Active).Select(e => e.GroupId).ToList() ?? [];
+        }
+        await LoadAsync();
+        Loading = false;
+    }
+    private async Task LoadAsync() { list = await MaterialsSvc.ListAsync(category, groups); }
+    private void Set(MaterialCategory? c) { category = c; _ = LoadAsync().ContinueWith(_ => InvokeAsync(StateHasChanged)); }
+}

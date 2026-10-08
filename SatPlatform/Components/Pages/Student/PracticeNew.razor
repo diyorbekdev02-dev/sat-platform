@@ -1,0 +1,98 @@
+@page "/practice/new"
+@attribute [Authorize(Roles = "Student")]
+@inherits AppPage
+@inject ContentService Content
+@inject PracticeService PracticeSvc
+
+<PageTitle>Mashqni sozlash</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="card">
+        <h2>@Labels.PracticeMode(r.Mode)</h2>
+        @if (r.Mode is PracticeMode.Weakness) { <p class="muted small">Tizim aniqlagan zaif skilllardan savollar beriladi.</p> }
+        else if (r.Mode is PracticeMode.Mistake) { <p class="muted small">Oldin xato qilgan savollaringiz va shu skilllardan yangi savollar aralash beriladi.</p> }
+
+        @if (r.Mode is not PracticeMode.Mistake)
+        {
+            <label class="lbl">Bo'lim</label>
+            <div class="chips">
+                <button class="chip @(r.Section is null ? "active" : "")" @onclick="() => SetSection(null)">Hammasi</button>
+                @foreach (var s in new[] { Section.RW, Section.Math }) { <button class="chip @(r.Section == s ? "active" : "")" @onclick="() => SetSection(s)">@Labels.Section(s)</button> }
+            </div>
+        }
+        @if (r.Mode is not (PracticeMode.Weakness or PracticeMode.Mistake))
+        {
+            <label class="lbl">Domain</label>
+            <div class="chips">
+                <button class="chip @(r.DomainId is null ? "active" : "")" @onclick="() => SetDomain(null)">Hammasi</button>
+                @foreach (var d in domains.Where(d => r.Section is null || d.Section == r.Section)) { <button class="chip @(r.DomainId == d.Id ? "active" : "")" @onclick="() => SetDomain(d.Id)">@d.Name</button> }
+            </div>
+            <label class="lbl">Skill</label>
+            <div class="chips">
+                <button class="chip @(r.SkillId is null ? "active" : "")" @onclick="() => r.SkillId = null">Hammasi</button>
+                @foreach (var s in domains.Where(d => (r.DomainId is null || d.Id == r.DomainId) && (r.Section is null || d.Section == r.Section)).SelectMany(d => d.Skills)) { <button class="chip @(r.SkillId == s.Id ? "active" : "")" @onclick="() => r.SkillId = s.Id">@s.Name</button> }
+            </div>
+        }
+        <label class="lbl">Qiyinlik</label>
+        <div class="chips">
+            <button class="chip @(r.Difficulty is null ? "active" : "")" @onclick="() => r.Difficulty = null">Aralash</button>
+            @foreach (var d in Enum.GetValues<Difficulty>()) { <button class="chip @(r.Difficulty == d ? "active" : "")" @onclick="() => r.Difficulty = d">@Labels.Difficulty(d)</button> }
+        </div>
+        <div class="form-row mt">
+            <div><label class="lbl">Savollar soni</label><input class="input" type="number" min="1" max="60" @bind="r.Count" /></div>
+            <div><label class="lbl">Vaqt (daqiqa, 0 = vaqtsiz)</label><input class="input" type="number" min="0" max="180" @bind="minutes" /></div>
+        </div>
+        @if (Error is not null) { <div class="alert danger mt">@Error</div> }
+        <div class="row end mt">
+            <a class="btn" href="/practice">Bekor qilish</a>
+            <button class="btn primary lg" @onclick="StartAsync" disabled="@busy"><Icon Name="play" /> Mashqni boshlash</button>
+        </div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "section")] public int? QSection { get; set; }
+    [SupplyParameterFromQuery(Name = "domain")] public int? QDomain { get; set; }
+    [SupplyParameterFromQuery(Name = "skill")] public int? QSkill { get; set; }
+    [SupplyParameterFromQuery(Name = "count")] public int? QCount { get; set; }
+    [SupplyParameterFromQuery(Name = "difficulty")] public int? QDifficulty { get; set; }
+    [SupplyParameterFromQuery(Name = "mode")] public int? QMode { get; set; }
+    private readonly PracticeRequest r = new();
+    private List<Domain> domains = [];
+    private int minutes;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Mashqni sozlash", narrow: true);
+        domains = await Content.DomainsAsync();
+        r.Mode = QMode is int m && Enum.IsDefined((PracticeMode)m) ? (PracticeMode)m : PracticeMode.Custom;
+        r.Count = QCount ?? r.Mode switch { PracticeMode.Quick => 10, PracticeMode.Standard => 20, PracticeMode.Intensive => 30, _ => 15 };
+        r.Difficulty = QDifficulty is int d && Enum.IsDefined((Difficulty)d) ? (Difficulty)d : null;
+        if (QSkill is int sk)
+        {
+            var dom = domains.FirstOrDefault(x => x.Skills.Any(s => s.Id == sk));
+            if (dom is not null) { r.SkillId = sk; r.DomainId = dom.Id; r.Section = dom.Section; }
+        }
+        else if (QDomain is int dm) { var dom = domains.FirstOrDefault(x => x.Id == dm); if (dom is not null) { r.DomainId = dm; r.Section = dom.Section; } }
+        else if (QSection is int s && Enum.IsDefined((Section)s)) r.Section = (Section)s;
+        Loading = false;
+    }
+
+    private void SetSection(Section? s) { r.Section = s; r.DomainId = null; r.SkillId = null; }
+    private void SetDomain(int? d) { r.DomainId = d; r.SkillId = null; if (d is not null) r.Section = domains.First(x => x.Id == d).Section; }
+
+    private async Task StartAsync()
+    {
+        busy = true; Error = null;
+        try
+        {
+            r.TimeLimitMinutes = minutes > 0 ? minutes : null;
+            var session = await PracticeSvc.StartAsync(await Me.StudentIdAsync() ?? 0, r);
+            Nav.NavigateTo($"/practice/{session.Id}");
+        }
+        catch (AppException ex) { Error = ex.Message; busy = false; }
+    }
+}

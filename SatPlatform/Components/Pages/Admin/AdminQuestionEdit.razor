@@ -1,0 +1,143 @@
+@page "/admin/questions/{Id}"
+@attribute [Authorize(Roles = "Admin,SuperAdmin,Teacher")]
+@inherits AppPage
+@inject ContentService Content
+
+<PageTitle>Savol</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (!canManage) { <div class="empty"><h3>Ruxsat yo'q</h3></div> }
+else
+{
+    <div class="grid" style="grid-template-columns: 1fr 320px">
+        <div class="stack">
+            <div class="card">
+                <div class="row between mb"><h2>@(e.Id == 0 ? "Yangi savol" : $"Savol #{e.Id}")</h2><div class="row">@if (e.Id > 0) { <button class="btn sm" @onclick="() => preview = !preview"><Icon Name="eye" /> @(preview ? "Tahrirlash" : "Ko'rish")</button> }</div></div>
+                @if (preview && version is not null)
+                {
+                    <div class="alert">O'quvchi ko'radigan ko'rinish (joriy saqlangan versiya v@(version.Version)).</div>
+                    <QuestionView Version="version" Mode="QuestionView.QuestionMode.Review" Answer="@(ScoringService.Options(version).FirstOrDefault(o => o.IsCorrect)?.Key ?? version.CorrectAnswer?.Split('|')[0])" IsCorrect="true" />
+                }
+                else
+                {
+                    <div class="form-row">
+                        <div><label class="lbl">Bo'lim</label><select class="input" @bind="section" @bind:after="() => { e.DomainId = 0; e.SkillId = 0; }"><option value="0">Reading & Writing</option><option value="1">Math</option></select></div>
+                        <div><label class="lbl">Domain</label><select class="input" @bind="e.DomainId" @bind:after="() => e.SkillId = 0"><option value="0">— tanlang —</option>@foreach (var d in domains.Where(d => (int)d.Section == section)) { <option value="@d.Id">@d.Name</option> }</select></div>
+                        <div><label class="lbl">Skill</label><select class="input" @bind="e.SkillId"><option value="0">— tanlang —</option>@foreach (var s in domains.Where(d => d.Id == e.DomainId).SelectMany(d => d.Skills)) { <option value="@s.Id">@s.Name</option> }</select></div>
+                        <div><label class="lbl">Qiyinlik</label><select class="input" @bind="e.Difficulty">@foreach (var d in Enum.GetValues<Difficulty>()) { <option value="@d">@Labels.Difficulty(d)</option> }</select></div>
+                        <div><label class="lbl">Tur</label><select class="input" @bind="e.Type"><option value="MultipleChoice">Multiple choice (A–D)</option><option value="SPR">SPR (son javob)</option></select></div>
+                        <div><label class="lbl">Teg (ixtiyoriy)</label><input class="input" @bind="e.Tag" placeholder="masalan: 2026-mock-1" /></div>
+                    </div>
+                    <label class="lbl">Passage / kontekst (ixtiyoriy, chap panelda ko'rsatiladi)</label>
+                    <RichEditor @bind-Value="e.Passage" Placeholder="Matn, jadval yoki rasm..." Tall="true" />
+                    <label class="lbl">Savol matni</label>
+                    <RichEditor @bind-Value="e.Text" Placeholder="Savol..." />
+                    @if (e.Type == QuestionType.MultipleChoice)
+                    {
+                        <label class="lbl">Variantlar (to'g'risini belgilang)</label>
+                        @foreach (var o in e.Options)
+                        {
+                            <div class="option-edit">
+                                <div class="key">@o.Key</div>
+                                <RichEditor @bind-Value="o.Text" Placeholder="@($"Variant {o.Key}")" />
+                                <label class="correct-pick"><input type="radio" name="correct" checked="@o.IsCorrect" @onchange="() => SetCorrect(o.Key)" /> to'g'ri</label>
+                            </div>
+                        }
+                    }
+                    else
+                    {
+                        <label class="lbl">To'g'ri javob(lar) — bir nechta bo'lsa | bilan ajrating</label>
+                        <input class="input" @bind="e.CorrectAnswer" placeholder="masalan: 2/3|0.667|.667" />
+                        <div class="hint">O'quvchi 3 va undan ko'p xonali o'nlik kiritsa, yaxlitlangan/kesilgan qiymat ham to'g'ri hisoblanadi (0.666, 0.667).</div>
+                    }
+                    <label class="lbl">Izoh (explanation)</label>
+                    <RichEditor @bind-Value="e.Explanation" Placeholder="Qadam-baqadam yechim..." />
+                    <label class="lbl">Video izoh URL (ixtiyoriy)</label>
+                    <input class="input" @bind="e.VideoUrl" placeholder="https://youtube.com/..." />
+                }
+            </div>
+        </div>
+        <div class="stack">
+            <div class="card">
+                <label class="lbl">Holat</label>
+                <select class="input" @bind="e.Status"><option value="Draft">Qoralama</option><option value="Review">Tekshiruvda</option><option value="Active">Faol</option><option value="Archived">Arxiv</option></select>
+                @if (errors.Count > 0) { <div class="alert danger mt"><ul>@foreach (var x in errors) { <li>@x</li> }</ul></div> }
+                @if (dups.Count > 0) { <div class="alert warn mt"><b>O'xshash savollar bor:</b><ul>@foreach (var d in dups) { <li><a href="/admin/questions/@d.Id">#@d.Id</a> @d.Preview</li> }</ul></div> }
+                <button class="btn primary full mt" @onclick="SaveAsync" disabled="@busy"><Icon Name="check" /> Saqlash</button>
+                @if (e.Id > 0 && isAdmin) { <button class="btn danger full mt-s" @onclick="DeleteAsync"><Icon Name="trash" /> O'chirish</button> }
+                <a class="btn ghost full mt-s" href="/admin/questions">← Bankga qaytish</a>
+            </div>
+            @if (q is not null)
+            {
+                <div class="card small">
+                    <dl class="kv"><dt>Versiya</dt><dd>v@(q.CurrentVersion)</dd><dt>Urinishlar</dt><dd>@q.AttemptCount</dd><dt>Aniqlik</dt><dd>@(q.AttemptCount == 0 ? "—" : $"{q.CorrectCount * 100 / q.AttemptCount}%")</dd><dt>O'rt. vaqt</dt><dd>@(q.AttemptCount == 0 ? "—" : $"{q.TotalTimeSeconds / q.AttemptCount} s")</dd><dt>Yaratilgan</dt><dd>@Tz.Fmt(q.CreatedAt)</dd><dt>O'zgartirilgan</dt><dd>@Tz.Fmt(q.UpdatedAt)</dd></dl>
+                    <p class="muted mt-s">Matn o'zgartirilsa yangi versiya yaratiladi; eski urinishlar eski versiya bilan qoladi.</p>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public string Id { get; set; } = "new";
+    private QuestionEdit e = new();
+    private Question? q;
+    private QuestionVersion? version;
+    private List<Domain> domains = [];
+    private List<string> errors = [];
+    private List<QuestionRow> dups = [];
+    private int section;
+    private bool canManage, isAdmin, busy, preview;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Savol");
+        canManage = await Me.CanManageQuestionsAsync(); isAdmin = await Me.IsAdminAsync();
+        domains = await Content.DomainsAsync(includeInactive: true);
+        if (int.TryParse(Id, out var id) && id > 0)
+        {
+            q = await Content.GetAsync(id);
+            if (q is not null) { e = QuestionEdit.From(q); section = (int)q.Section; await LoadVersion(); }
+        }
+        else { e = new QuestionEdit { Section = Section.Math }; section = 1; }
+        Loading = false;
+    }
+
+    private async Task LoadVersion()
+    {
+        if (q is null) return;
+        version = (await Content.GetAsync(q.Id))?.Versions.OrderByDescending(v => v.Version).FirstOrDefault();
+        if (version is null) { var vid = 0; try { vid = await VersionId(q.Id); } catch { } if (vid > 0) version = await Content.GetVersionAsync(vid); }
+    }
+
+    private async Task<int> VersionId(int qid)
+    {
+        var full = await Content.GetAsync(qid);
+        return full?.Versions.OrderByDescending(v => v.Version).FirstOrDefault()?.Id ?? 0;
+    }
+
+    private void SetCorrect(string key) { foreach (var o in e.Options) o.IsCorrect = o.Key == key; }
+
+    private async Task SaveAsync()
+    {
+        busy = true; errors = [];
+        e.Section = (Section)section;
+        var (id, errs) = await Content.SaveAsync(e, await Me.IdAsync());
+        errors = errs;
+        busy = false;
+        if (errs.Count > 0 && e.Status == QuestionStatus.Active) { Toasts.Error("Faol savolda xatolar bor — holat saqlanmadi."); return; }
+        if (id == 0) { Toasts.Error(string.Join(" ", errs)); return; }
+        dups = await Content.FindDuplicatesAsync(e.Text, id);
+        Toasts.Ok("Saqlandi" + (errs.Count > 0 ? " (qoralama sifatida; kamchiliklar bor)" : ""));
+        if (e.Id == 0) Nav.NavigateTo($"/admin/questions/{id}");
+        else { q = await Content.GetAsync(id); if (q is not null) { e = QuestionEdit.From(q); } await LoadVersion(); }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (!await ConfirmAsync("Savolni butunlay o'chirasizmi? Ishlatilgan bo'lsa o'chirib bo'lmaydi (arxivlang).")) return;
+        var err = await Content.DeleteAsync(e.Id, await Me.IdAsync());
+        if (err is not null) { Toasts.Error(err); return; }
+        Nav.NavigateTo("/admin/questions");
+    }
+}

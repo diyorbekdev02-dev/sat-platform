@@ -1,0 +1,75 @@
+@page "/practice/{SessionId:int}/result"
+@attribute [Authorize]
+@inherits AppPage
+@inject PracticeService PracticeSvc
+@inject AcademyService Academy
+@inject AnalyticsService Analytics
+
+<PageTitle>Mashq natijasi</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (s is null) { <div class="empty"><h3>Topilmadi</h3></div> }
+else if (s.Status == PracticeStatus.InProgress && !staff) { <div class="card"><div class="empty"><h3>Mashq davom etmoqda</h3><a class="btn primary mt" href="/practice/@SessionId">Davom ettirish</a></div></div> }
+else
+{
+    var answered = s.Questions.Where(q => q.AnsweredAt is not null).ToList();
+    var acc = answered.Count == 0 ? 0 : s.CorrectCount * 100 / answered.Count;
+    <div class="card" style="text-align:center;padding:28px">
+        <div class="muted small">MASHQ YAKUNLANDI · @s.Title · @Tz.Fmt(s.CompletedAt ?? s.StartedAt)</div>
+        <div style="font-size:56px;font-weight:800;margin:8px 0">@acc%</div>
+        <div class="row" style="justify-content:center"><span class="badge">@s.Questions.Count ta savol</span><span class="badge ok">@s.CorrectCount to'g'ri</span><span class="badge danger">@(answered.Count - s.CorrectCount) xato</span>@if (answered.Count < s.Questions.Count) { <span class="badge warn">@(s.Questions.Count - answered.Count) javobsiz</span> }<span class="badge"><Icon Name="clock" Size="14" /> o'rtacha @(answered.Count == 0 ? 0 : (int)answered.Average(q => q.TimeSpentSeconds)) s</span></div>
+        @if (!staff)
+        {
+            <div class="row mt" style="justify-content:center">
+                <button class="btn" @onclick="() => showReview = !showReview"><Icon Name="eye" /> @(showReview ? "Yopish" : "Ko'rib chiqish")</button>
+                <a class="btn primary" href="/practice/new?@Again()"><Icon Name="refresh" /> Yana mashq qilish</a>
+                <a class="btn" href="/dashboard"><Icon Name="home" /> Bosh sahifa</a>
+            </div>
+        }
+    </div>
+    <div class="card mt">
+        <div class="card-title"><h2>Skilllar bo'yicha</h2></div>
+        <SkillBars Stats="skills" />
+    </div>
+    @if (showReview || staff)
+    {
+        <div class="stack mt">
+            @foreach (var q in s.Questions)
+            {
+                <div class="card">
+                    <div class="row mb-s"><span class="q-number"><span class="n">@(s.Questions.IndexOf(q) + 1)</span></span><span class="badge">@q.Question.Skill.Name</span><span class="badge @(q.IsCorrect == true ? "ok" : "danger")">@(q.IsCorrect == true ? "To'g'ri" : q.AnsweredAt is null ? "Javobsiz" : "Noto'g'ri")</span><span class="badge"><Icon Name="clock" Size="14" /> @q.TimeSpentSeconds s</span></div>
+                    <QuestionView Version="q.QuestionVersion" Mode="QuestionView.QuestionMode.Review" Answer="@q.Answer" IsCorrect="q.IsCorrect" />
+                </div>
+            }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public int SessionId { get; set; }
+    private Data.PracticeSession? s;
+    private bool staff, showReview;
+    private List<SkillStat> skills = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Mashq natijasi");
+        var sid = await Me.StudentIdAsync();
+        var role = await Me.RoleAsync();
+        staff = role is not UserRole.Student;
+        s = await PracticeSvc.GetAsync(SessionId, sid, staff);
+        if (s is not null && staff && !await Academy.CanSeeStudentAsync(await Me.IdAsync(), role!.Value, s.StudentId)) s = null;
+        if (s is not null)
+        {
+            var (weak, strong, _) = await Analytics.ThresholdsAsync();
+            skills = s.Questions.Where(q => q.AnsweredAt is not null).GroupBy(q => q.Question.Skill).Select(g =>
+            {
+                var acc = g.Count(q => q.IsCorrect == true) * 100.0 / g.Count();
+                return new SkillStat(g.Key.Id, g.Key.Name, g.Key.Domain.Name, g.Key.Domain.Section, g.Count(), g.Count(q => q.IsCorrect == true), Math.Round(acc), Math.Round(g.Average(q => q.TimeSpentSeconds)), acc < weak ? "weak" : acc > strong ? "strong" : "medium");
+            }).OrderBy(x => x.Accuracy).ToList();
+        }
+        Loading = false;
+    }
+
+    private string Again() => s is null ? "" : $"mode={(int)(s.Mode == PracticeMode.Homework ? PracticeMode.Custom : s.Mode)}&count={s.QuestionCount}" + (s.SkillId is int sk ? $"&skill={sk}" : s.DomainId is int d ? $"&domain={d}" : s.Section is Section sec ? $"&section={(int)sec}" : "") + (s.Difficulty is Difficulty df ? $"&difficulty={(int)df}" : "");
+}

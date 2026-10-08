@@ -1,0 +1,8 @@
+**/bin/
+**/obj/
+**/.vs/
+**/appsettings.Local.json
+SatPlatform.Tests/
+.git/
+deploy/
+*.md

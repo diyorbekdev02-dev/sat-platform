@@ -1,0 +1,69 @@
+@page "/admin/students"
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+@inject AnalyticsService Analytics
+
+<PageTitle>O'quvchilar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="row between mb">
+        <div class="row">
+            <input class="input sm" style="width:240px" placeholder="Ism yoki telefon" @bind="search" @bind:event="oninput" />
+            <select class="input sm" @bind="status"><option value="">Barcha holatlar</option>@foreach (var s in Enum.GetValues<StudentStatus>()) { <option value="@s">@Labels.StudentStatus(s)</option> }</select>
+            <select class="input sm" @bind="groupId"><option value="0">Barcha guruhlar</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select>
+            <select class="input sm" @bind="scoreBand"><option value="">Ball</option><option value="none">Ballsiz</option><option value="lt1000">&lt; 1000</option><option value="1000-1200">1000–1200</option><option value="1200-1400">1200–1400</option><option value="gt1400">&gt; 1400</option></select>
+        </div>
+        <button class="btn primary" @onclick="() => createOpen = true"><Icon Name="plus" /> O'quvchi qo'shish</button>
+    </div>
+    <div class="card pad-0"><div class="table-wrap"><table class="table">
+        <thead><tr><th>Ism</th><th>Telefon</th><th>Guruh</th><th>Holat</th><th class="num">Ball</th><th class="num">Maqsad</th><th class="num">Aniqlik</th><th class="num">Davomat</th><th>Oxirgi faollik</th><th></th></tr></thead>
+        <tbody>@foreach (var s in Filtered)
+        {
+            <tr class="click" @onclick="@(() => Nav.NavigateTo($"/admin/students/{s.StudentId}"))">
+                <td class="bold">@s.Name</td><td>@s.Phone</td><td>@s.Groups</td><td><span class="badge @(s.Status == StudentStatus.Active ? "ok" : "")">@Labels.StudentStatus(s.Status)</span></td>
+                <td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Target?.ToString() ?? "—")</td><td class="num">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num">@(s.Attendance?.ToString() ?? "—")%</td><td>@Tz.Fmt(s.LastActive)</td>
+                <td><a class="btn sm" href="/admin/students/@s.StudentId">Ochish</a></td>
+            </tr>
+        }</tbody></table></div>@if (!Filtered.Any()) { <div class="empty"><h3>O'quvchilar topilmadi</h3></div> }</div>
+
+    <Modal Open="createOpen" OpenChanged="v => createOpen = v" Title="Yangi o'quvchi">
+        <label class="lbl">Ism-familiya</label><input class="input" @bind="nName" />
+        <label class="lbl">Telefon</label><input class="input" @bind="nPhone" placeholder="+998 90 123 45 67" />
+        <div class="form-row"><div><label class="lbl">Parol</label><input class="input" @bind="nPassword" placeholder="kamida 6 belgi" /></div><div><label class="lbl">Maqsad ball</label><input class="input" type="number" min="400" max="1600" @bind="nTarget" /></div></div>
+        <label class="lbl">Guruh (ixtiyoriy)</label><select class="input" @bind="nGroup"><option value="0">—</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select>
+        <div class="hint">O'quvchi Telegram botga raqamini yuborsa, parolsiz havola orqali ham kira oladi.</div>
+        @if (Error is not null) { <div class="error">@Error</div> }
+        <div class="modal-actions"><button class="btn" @onclick="() => createOpen = false">Bekor</button><button class="btn primary" @onclick="CreateAsync" disabled="@busy">Yaratish</button></div>
+    </Modal>
+}
+
+@code {
+    private List<AnalyticsService.StudentSummary> students = [];
+    private List<Group> groups = [];
+    private string search = "", status = "", scoreBand = "";
+    private int groupId, nGroup;
+    private bool createOpen, busy;
+    private string nName = "", nPhone = "+998 ", nPassword = "";
+    private int? nTarget;
+
+    private IEnumerable<AnalyticsService.StudentSummary> Filtered => students.Where(s =>
+        (string.IsNullOrWhiteSpace(search) || s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || s.Phone.Contains(search)) &&
+        (status == "" || s.Status.ToString() == status) &&
+        (groupId == 0 || s.Groups.Split(", ").Contains(groups.FirstOrDefault(g => g.Id == groupId)?.Name)) &&
+        (scoreBand switch { "none" => s.Score is null, "lt1000" => s.Score < 1000, "1000-1200" => s.Score is >= 1000 and < 1200, "1200-1400" => s.Score is >= 1200 and < 1400, "gt1400" => s.Score >= 1400, _ => true }));
+
+    protected override async Task OnInitializedAsync() { SetTitle("O'quvchilar"); groups = await Academy.GroupsAsync(); students = await Analytics.StudentSummariesAsync(); Loading = false; }
+
+    private async Task CreateAsync()
+    {
+        busy = true; Error = null;
+        var (id, err) = await Academy.CreateUserAsync(nName, nPhone, UserRole.Student, string.IsNullOrWhiteSpace(nPassword) ? null : nPassword, null, nTarget, await Me.IdAsync());
+        if (err is not null) { Error = err; busy = false; return; }
+        if (nGroup > 0 && await Academy.StudentIdOfUserAsync(id) is int sid) await Academy.EnrollAsync(sid, nGroup, await Me.IdAsync());
+        busy = false; createOpen = false; Toasts.Ok("O'quvchi yaratildi");
+        students = await Analytics.StudentSummariesAsync();
+    }
+}

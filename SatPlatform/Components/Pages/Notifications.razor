@@ -1,0 +1,37 @@
+@page "/notifications"
+@attribute [Authorize]
+@inherits AppPage
+@inject NotificationService NotifSvc
+
+<PageTitle>Bildirishnomalar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (list.Count == 0) { <div class="card"><div class="empty"><div class="big">🔔</div><h3>Bildirishnomalar yo'q</h3></div></div> }
+else
+{
+    <div class="card">
+        @foreach (var n in list)
+        {
+            <div class="notif @(n.IsRead ? "" : "unread")">
+                <div class="grow" style="flex:1">
+                    <div class="title">@n.Title</div>
+                    <div class="body">@n.Body</div>
+                    <div class="time">@Tz.Fmt(n.CreatedAt)@(n.SentToTelegram ? " · Telegram'ga yuborildi" : "")</div>
+                </div>
+                @if (n.Link is not null) { <a class="btn sm" href="@n.Link">Ochish</a> }
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Notification> list = [];
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Bildirishnomalar", narrow: true);
+        var uid = await Me.IdAsync();
+        list = await NotifSvc.ListAsync(uid);
+        await NotifSvc.MarkAllReadAsync(uid);
+        Loading = false;
+    }
+}

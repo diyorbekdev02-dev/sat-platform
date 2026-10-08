@@ -1,0 +1,69 @@
+@page "/admin/students/{StudentId:int}"
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+
+<PageTitle>O'quvchi</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (s is null) { <div class="empty"><h3>Topilmadi</h3></div> }
+else
+{
+    <div class="grid" style="grid-template-columns: 360px 1fr">
+        <div class="stack">
+            <div class="card">
+                <div class="row mb"><div class="avatar lg" style="background:@s.User.AvatarColor">@s.User.FullName[0]</div><div><h2>@s.User.FullName</h2><div class="muted small">@s.User.Phone · @(s.User.TelegramChatId is null ? "Telegram ulanmagan" : "Telegram ✓")</div></div></div>
+                <label class="lbl">Ism-familiya</label><input class="input" @bind="name" />
+                <label class="lbl">Telefon</label><input class="input" @bind="phone" />
+                <label class="lbl">Email</label><input class="input" @bind="email" />
+                <div class="form-row"><div><label class="lbl">Holat</label><select class="input" @bind="status">@foreach (var x in Enum.GetValues<StudentStatus>()) { <option value="@x">@Labels.StudentStatus(x)</option> }</select></div><div><label class="lbl">Maqsad ball</label><input class="input" type="number" min="400" max="1600" @bind="target" /></div></div>
+                <label class="lbl">Izoh (faqat xodimlar ko'radi)</label><textarea class="input" @bind="notes" rows="2"></textarea>
+                <label class="lbl">Yangi parol (bo'sh = o'zgarmaydi)</label><input class="input" @bind="newPassword" />
+                <label class="check mt-s"><input type="checkbox" @bind="active" /> Hisob faol</label>
+                <button class="btn primary full mt" @onclick="SaveAsync" disabled="@busy">Saqlash</button>
+                <div class="mt small muted">Ota-ona kodi: <span class="copy-code">@s.ParentCode</span></div>
+            </div>
+            <div class="card">
+                <h3>Guruhlar</h3>
+                <div class="list mt-s">@foreach (var e in s.Enrollments.Where(e => e.Status == EnrollmentStatus.Active)) { <div class="list-item"><div class="grow"><div class="title">@e.Group.Name</div><div class="sub">@e.StartDate dan</div></div><button class="btn sm danger" @onclick="() => UnenrollAsync(e.GroupId)">Chiqarish</button></div> }</div>
+                <div class="row mt-s"><select class="input sm" @bind="enrollGroup"><option value="0">— guruh —</option>@foreach (var g in groups.Where(g => s.Enrollments.All(e => e.GroupId != g.Id || e.Status != EnrollmentStatus.Active))) { <option value="@g.Id">@g.Name</option> }</select><button class="btn sm" @onclick="EnrollAsync" disabled="@(enrollGroup == 0)">Biriktirish</button></div>
+                @if (s.Enrollments.Any(e => e.Status == EnrollmentStatus.Ended)) { <details class="mt-s small"><summary class="muted">Guruh tarixi</summary>@foreach (var e in s.Enrollments.Where(e => e.Status == EnrollmentStatus.Ended)) { <div>@e.Group.Name: @e.StartDate – @e.EndDate</div> }</details> }
+            </div>
+            <div class="card">
+                <h3>Ota-onalar</h3>
+                <div class="list mt-s">@foreach (var p in s.Parents) { <div class="list-item"><div class="grow"><div class="title">@p.ParentUser.FullName</div><div class="sub">@p.ParentUser.Phone</div></div><button class="btn sm danger" @onclick="() => UnlinkAsync(p.ParentUserId)">Uzish</button></div> }</div>
+                <div class="row mt-s"><select class="input sm" @bind="linkParent"><option value="0">— ota-ona —</option>@foreach (var p in parents) { <option value="@p.Id">@p.FullName (@p.Phone)</option> }</select><button class="btn sm" @onclick="LinkAsync" disabled="@(linkParent == 0)">Bog'lash</button></div>
+            </div>
+        </div>
+        <div><StudentProgressPanel StudentId="StudentId" /></div>
+    </div>
+}
+
+@code {
+    [Parameter] public int StudentId { get; set; }
+    private Data.Student? s;
+    private List<Group> groups = [];
+    private List<UserRow> parents = [];
+    private string name = "", phone = "", email = "", notes = "", newPassword = "";
+    private StudentStatus status; private int? target; private bool active, busy;
+    private int enrollGroup, linkParent;
+
+    protected override async Task OnInitializedAsync() { SetTitle("O'quvchi"); groups = await Academy.GroupsAsync(); parents = await Academy.UsersAsync(UserRole.Parent); await LoadAsync(); Loading = false; }
+    private async Task LoadAsync()
+    {
+        s = await Academy.StudentAsync(StudentId);
+        if (s is null) return;
+        name = s.User.FullName; phone = s.User.Phone; email = s.User.Email ?? ""; notes = s.Notes ?? ""; status = s.Status; target = s.TargetScore; active = s.User.IsActive; newPassword = "";
+    }
+    private async Task SaveAsync()
+    {
+        busy = true;
+        var err = await Academy.UpdateUserAsync(s!.UserId, name, phone, email, UserRole.Student, active, false, string.IsNullOrWhiteSpace(newPassword) ? null : newPassword, await Me.IdAsync(), target, status, notes);
+        busy = false;
+        if (err is not null) Toasts.Error(err); else { Toasts.Ok("Saqlandi"); await LoadAsync(); }
+    }
+    private async Task EnrollAsync() { var err = await Academy.EnrollAsync(StudentId, enrollGroup, await Me.IdAsync()); if (err is not null) Toasts.Error(err); enrollGroup = 0; await LoadAsync(); }
+    private async Task UnenrollAsync(int gid) { await Academy.UnenrollAsync(StudentId, gid, await Me.IdAsync()); await LoadAsync(); }
+    private async Task LinkAsync() { var err = await Academy.LinkParentAsync(linkParent, StudentId, await Me.IdAsync()); if (err is not null) Toasts.Error(err); linkParent = 0; await LoadAsync(); }
+    private async Task UnlinkAsync(int pid) { await Academy.UnlinkParentAsync(pid, StudentId, await Me.IdAsync()); await LoadAsync(); }
+}

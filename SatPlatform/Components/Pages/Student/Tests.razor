@@ -1,0 +1,118 @@
+@page "/tests"
+@attribute [Authorize(Roles = "Student")]
+@inherits AppPage
+@inject TestEngineService Engine
+
+<PageTitle>Testlar</PageTitle>
+
+<div class="tabs">
+    <button class="tab @(tab == "available" ? "active" : "")" @onclick="@(() => tab = "available")">Mavjud testlar</button>
+    <button class="tab @(tab == "attempts" ? "active" : "")" @onclick="@(() => tab = "attempts")">Mening urinishlarim</button>
+</div>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (tab == "available")
+{
+    <div class="chips mb">
+        @foreach (var f in new[] { ("all", "Hammasi"), ("Diagnostic", "Diagnostik"), ("FullMock", "To'liq SAT"), ("SectionTest", "Bo'lim"), ("assigned", "Tayinlangan") })
+        {
+            <button class="chip @(filter == f.Item1 ? "active" : "")" @onclick="() => filter = f.Item1">@f.Item2</button>
+        }
+    </div>
+    @if (!Filtered.Any()) { <div class="card"><div class="empty"><div class="big">📝</div><h3>Testlar yo'q</h3><p class="small">Hozircha sizga test tayinlanmagan.</p></div></div> }
+    <div class="stack">
+        @foreach (var t in Filtered)
+        {
+            <div class="card">
+                <div class="row between">
+                    <div>
+                        <div class="row">
+                            <h2>@t.Test.Title</h2>
+                            <span class="badge accent">@Labels.TestType(t.Test.Type)</span>
+                            @if (t.Test.IsAdaptive) { <span class="badge">Adaptiv</span> }
+                        </div>
+                        <div class="small muted mt-s">@t.Test.Description</div>
+                        <div class="small muted mt-s">
+                            @Structure(t.Test)
+                            @if (t.Assignment is not null)
+                            {
+                                <span> · Tayinlangan@(t.Assignment.EndAt is not null ? $" · Muddat: {Tz.Fmt(t.Assignment.EndAt)}" : "")</span>
+                            }
+                            <span> · Urinishlar: @t.AttemptsUsed@(t.AttemptLimit is int l ? $"/{l}" : "")</span>
+                        </div>
+                    </div>
+                    <div class="row">
+                        @if (t.LastCompleted is not null) { <a class="btn sm" href="/attempt/@t.LastCompleted.Id/result">Oxirgi natija@(t.LastCompleted.TotalScore is int s ? $": {s}" : "")</a> }
+                        @if (t.ActiveAttempt is not null) { <a class="btn primary" href="/attempt/@t.ActiveAttempt.Id">Davom ettirish</a> }
+                        else if (t.Expired) { <span class="badge danger">Muddati o'tgan</span> }
+                        else if (t.NotStarted) { <span class="badge warn">Hali boshlanmagan</span> }
+                        else if (!t.CanStart) { <span class="badge">Urinishlar tugagan</span> }
+                        else { <a class="btn primary" href="/tests/@t.Test.Id/start@(t.Assignment is null ? "" : $"?assignment={t.Assignment.Id}")"><Icon Name="play" /> Testni boshlash</a> }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="card pad-0">
+        @if (attempts.Count == 0) { <div class="empty"><h3>Hali urinishlar yo'q</h3></div> }
+        else
+        {
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th>Test</th><th>Boshlangan</th><th>Holat</th><th class="num">Umumiy</th><th class="num">R&W</th><th class="num">Math</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var a in attempts)
+                    {
+                        <tr>
+                            <td>@a.Test.Title</td><td>@Tz.Fmt(a.StartedAt)</td>
+                            <td><span class="badge @(a.Status == AttemptStatus.Completed ? "ok" : a.Status is AttemptStatus.InProgress or AttemptStatus.Break ? "warn" : "")">@Labels.AttemptStatus(a.Status)</span></td>
+                            <td class="num bold">@(a.TotalScore?.ToString() ?? (a.Status == AttemptStatus.Completed ? $"{a.RwRaw + a.MathRaw}/{a.RwMax + a.MathMax}" : "—"))</td>
+                            <td class="num">@(a.RwScore?.ToString() ?? (a.RwMax > 0 ? $"{a.RwRaw}/{a.RwMax}" : "—"))</td><td class="num">@(a.MathScore?.ToString() ?? (a.MathMax > 0 ? $"{a.MathRaw}/{a.MathMax}" : "—"))</td>
+                            <td>
+                                @if (a.Status == AttemptStatus.Completed) { <a class="btn sm" href="/attempt/@a.Id/result">Natija</a> }
+                                else if (a.Status is AttemptStatus.InProgress or AttemptStatus.Break) { <a class="btn sm primary" href="/attempt/@a.Id">Davom ettirish</a> }
+                            </td>
+                        </tr>
+                    }
+                </tbody></table></div>
+        }
+    </div>
+}
+
+@code {
+    private string tab = "available", filter = "all";
+    private List<AvailableTest> available = [];
+    private List<TestAttempt> attempts = [];
+    private IEnumerable<AvailableTest> Filtered => filter switch
+    {
+        "assigned" => available.Where(t => t.Assignment is not null),
+        "all" => available,
+        _ => available.Where(t => t.Test.Type.ToString() == filter)
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Testlar");
+        var sid = await Me.StudentIdAsync() ?? 0;
+        available = await Engine.AvailableAsync(sid);
+        attempts = await Engine.AttemptsAsync(sid);
+        Loading = false;
+    }
+
+    private static string Structure(Test t)
+    {
+        var parts = new List<string>();
+        foreach (var s in new[] { Section.RW, Section.Math })
+        {
+            var mods = t.Modules.Where(m => m.Section == s).ToList();
+            if (mods.Count == 0) continue;
+            var m1 = mods.FirstOrDefault(m => m.ModuleNumber == 1);
+            var count = mods.Select(m => m.ModuleNumber).Distinct().Count();
+            var secs = (m1?.TimeLimitSeconds ?? 0) * count;
+            parts.Add($"{Labels.SectionShort(s)} {Labels.Minutes(secs)} · {count} modul");
+        }
+        return string.Join(" · ", parts);
+    }
+}

@@ -1,0 +1,66 @@
+@* Inline SVG line chart of SAT score history (total, R&W, Math). Built as markup because Razor reserves the <text> tag. *@
+@if (Points.Count == 0)
+{
+    <div class="empty"><h3>Hali ma'lumot yo'q</h3><p>Kamida bitta to'liq test ishlang — progress shu yerda ko'rinadi.</p></div>
+}
+else
+{
+    @((MarkupString)Svg())
+    <div class="legend">
+        <span><i style="background:var(--accent)"></i>Umumiy</span>
+        @if (ShowSections) { <span><i style="background:var(--rw)"></i>Reading &amp; Writing</span><span><i style="background:var(--math)"></i>Math</span> }
+    </div>
+}
+
+@code {
+    [Parameter] public List<ScorePoint> Points { get; set; } = [];
+    [Parameter] public bool ShowSections { get; set; }
+    private const int W = 640, H = 220, L = 42, R = 16, T = 20, B = 26;
+    private double min, max;
+
+    protected override void OnParametersSet()
+    {
+        if (Points.Count == 0) return;
+        var vals = ShowSections ? Points.SelectMany(p => new[] { p.Total, p.Rw, p.Math }) : Points.Select(p => p.Total);
+        min = System.Math.Max(0, vals.Min() - 60); max = vals.Max() + 60;
+        if (max - min < 100) max = min + 100;
+    }
+
+    private double X(int i) => Points.Count == 1 ? (L + W - R) / 2.0 : L + (W - L - R) * i / (double)(Points.Count - 1);
+    private double Y(double v) => T + (H - T - B) * (1 - (v - min) / (max - min));
+    private static string F(double v) => v.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture);
+    private string Line(Func<ScorePoint, int> sel) => string.Join(" ", Points.Select((p, i) => $"{F(X(i))},{F(Y(sel(p)))}"));
+    private static string E(string s) => System.Net.WebUtility.HtmlEncode(s);
+
+    private string Svg()
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append($"<svg class=\"chart\" viewBox=\"0 0 {W} {H}\" role=\"img\" aria-label=\"SAT ball dinamikasi\">");
+        for (var g = 0; g <= 4; g++)
+        {
+            var v = min + (max - min) * g / 4.0; var y = Y(v);
+            sb.Append($"<line class=\"grid-line\" x1=\"{L}\" x2=\"{W - R}\" y1=\"{F(y)}\" y2=\"{F(y)}\"/>");
+            sb.Append($"<text x=\"{L - 6}\" y=\"{F(y + 4)}\" text-anchor=\"end\">{(int)v}</text>");
+        }
+        if (ShowSections)
+        {
+            sb.Append($"<polyline class=\"line rw\" points=\"{Line(p => p.Rw)}\"/>");
+            sb.Append($"<polyline class=\"line math\" points=\"{Line(p => p.Math)}\"/>");
+        }
+        sb.Append($"<polyline class=\"line\" points=\"{Line(p => p.Total)}\"/>");
+        for (var i = 0; i < Points.Count; i++)
+        {
+            var p = Points[i];
+            sb.Append($"<circle class=\"dot\" cx=\"{F(X(i))}\" cy=\"{F(Y(p.Total))}\" r=\"4\"><title>{E(p.Title)} — {p.Total} ({Tz.FmtDate(p.Date)})</title></circle>");
+            if (ShowSections)
+            {
+                sb.Append($"<circle class=\"dot rw\" cx=\"{F(X(i))}\" cy=\"{F(Y(p.Rw))}\" r=\"3\"><title>R&amp;W {p.Rw}</title></circle>");
+                sb.Append($"<circle class=\"dot math\" cx=\"{F(X(i))}\" cy=\"{F(Y(p.Math))}\" r=\"3\"><title>Math {p.Math}</title></circle>");
+            }
+            sb.Append($"<text x=\"{F(X(i))}\" y=\"{H - 6}\" text-anchor=\"middle\">{Tz.Fmt(p.Date, "dd.MM")}</text>");
+            sb.Append($"<text x=\"{F(X(i))}\" y=\"{F(Y(p.Total) - 9)}\" text-anchor=\"middle\" style=\"font-weight:700;fill:var(--text)\">{p.Total}</text>");
+        }
+        sb.Append("</svg>");
+        return sb.ToString();
+    }
+}

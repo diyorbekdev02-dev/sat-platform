@@ -1,0 +1,145 @@
+@* Full progress view of a student: used on the student's own Analytics page and by teachers / admins / parents. *@
+@inject AnalyticsService Analytics
+@inject TestEngineService Engine
+@inject PracticeService PracticeSvc
+@inject AcademyService Academy
+@inject HomeworkService Homework
+
+@if (loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="tabs">
+        @foreach (var t in Tabs) { <button class="tab @(tab == t.Key ? "active" : "")" @onclick="() => tab = t.Key">@t.Value</button> }
+    </div>
+
+    @if (tab == "overview")
+    {
+        <div class="grid c4 mb">
+            <div class="stat accent"><div class="label">Joriy ball</div><div class="value">@(d.CurrentScore?.ToString() ?? "—")</div><div class="sub">@(d.CurrentScore is null ? "test ishlanmagan" : $"R&W {d.CurrentRw} · Math {d.CurrentMath}")</div></div>
+            <div class="stat"><div class="label">Maqsad</div><div class="value">@(d.TargetScore?.ToString() ?? "—")</div><div class="sub">@(AnalyticsService.TargetProgress(d.CurrentScore, d.TargetScore) is int p ? $"{p}% erishilgan" : "")</div></div>
+            <div class="stat"><div class="label">Umumiy aniqlik</div><div class="value">@d.OverallAccuracy%</div><div class="sub">@d.QuestionsSolved ta savol</div></div>
+            <div class="stat"><div class="label">Davomat</div><div class="value">@(d.AttendanceRate is double a ? $"{a}%" : "—")</div><div class="sub">streak 🔥 @d.Streak · @d.TestCount test · @d.PracticeCount mashq</div></div>
+        </div>
+        <div class="card mb"><div class="card-title"><h2>SAT ball dinamikasi</h2></div><ScoreChart Points="scores" ShowSections="true" /></div>
+        <div class="grid c2">
+            <div class="card"><div class="card-title"><h2>Zaif skilllar</h2></div>@if (d.WeakSkills.Count == 0) { <p class="muted small">Zaif skilllar aniqlanmagan.</p> } else { <SkillBars Stats="d.WeakSkills" /> }</div>
+            <div class="card"><div class="card-title"><h2>Tavsiya</h2></div>
+                @if (d.Recommendations.Count == 0) { <p class="muted small">Tavsiyalar yetarli ma'lumotdan so'ng paydo bo'ladi.</p> }
+                else { <div class="list">@foreach (var r in d.Recommendations) { <div class="list-item"><div class="grow"><div class="title">@r.Skill</div><div class="sub">@r.Reason · @r.Questions ta savol</div></div>@if (Self) { <a class="btn sm primary" href="/practice/new?skill=@r.SkillId&count=@r.Questions&difficulty=@((int)r.Difficulty)&mode=@((int)PracticeMode.Recommended)">Boshlash</a> }</div> }</div> }
+            </div>
+        </div>
+    }
+    else if (tab == "skills")
+    {
+        <div class="card">
+            <div class="row between mb"><h2>Skill heatmap</h2><div class="legend"><span><i style="background:var(--danger)"></i>Zaif &lt; @thr.Weak%</span><span><i style="background:var(--warn)"></i>O'rta</span><span><i style="background:var(--ok)"></i>Kuchli &gt; @thr.Strong%</span></div></div>
+            <SkillBars Stats="skills" />
+        </div>
+    }
+    else if (tab == "tests")
+    {
+        <div class="card pad-0">
+            @if (attempts.Count == 0) { <div class="empty"><h3>Testlar yo'q</h3></div> }
+            else
+            {
+                <div class="table-wrap"><table class="table">
+                    <thead><tr><th>Test</th><th>Sana</th><th>Holat</th><th class="num">Umumiy</th><th class="num">R&W</th><th class="num">Math</th><th></th></tr></thead>
+                    <tbody>@foreach (var a in attempts)
+                    {
+                        <tr><td>@a.Test.Title</td><td>@Tz.Fmt(a.StartedAt)</td><td><span class="badge @(a.Status == AttemptStatus.Completed ? "ok" : "")">@Labels.AttemptStatus(a.Status)</span></td>
+                            <td class="num bold">@(a.TotalScore?.ToString() ?? (a.Status == AttemptStatus.Completed ? $"{a.RwRaw + a.MathRaw}/{a.RwMax + a.MathMax}" : "—"))</td><td class="num">@(a.RwScore?.ToString() ?? "—")</td><td class="num">@(a.MathScore?.ToString() ?? "—")</td>
+                            <td>@if (a.Status == AttemptStatus.Completed) { <a class="btn sm" href="/attempt/@a.Id/result">Natija</a> <a class="btn sm" href="/attempt/@a.Id/review">Javoblar</a> }</td></tr>
+                    }</tbody></table></div>
+            }
+        </div>
+        <div class="card mt pad-0">
+            <div class="card-title" style="padding:14px 16px 0"><h2>Mashqlar</h2></div>
+            @if (practices.Count == 0) { <div class="empty"><h3>Mashqlar yo'q</h3></div> }
+            else
+            {
+                <div class="table-wrap"><table class="table"><thead><tr><th>Mashq</th><th>Rejim</th><th>Sana</th><th class="num">Natija</th><th></th></tr></thead>
+                    <tbody>@foreach (var p in practices) { <tr><td>@p.Title</td><td><span class="badge">@Labels.PracticeMode(p.Mode)</span></td><td>@Tz.Fmt(p.StartedAt)</td><td class="num">@p.CorrectCount / @p.QuestionCount</td><td><a class="btn sm" href="/practice/@p.Id/result">Ko'rish</a></td></tr> }</tbody></table></div>
+            }
+        </div>
+    }
+    else if (tab == "mistakes")
+    {
+        <div class="card pad-0">
+            @if (mistakes.Count == 0) { <div class="empty"><div class="big">🎉</div><h3>Xatolar yo'q</h3></div> }
+            else
+            {
+                <div class="table-wrap"><table class="table"><thead><tr><th>Skill</th><th>Domain</th><th class="num">Hal qilinmagan</th><th class="num">Jami</th></tr></thead>
+                    <tbody>@foreach (var g in mistakes) { <tr><td class="bold">@g.Skill</td><td>@g.Domain</td><td class="num level-weak bold">@g.Unresolved</td><td class="num">@g.Count</td></tr> }</tbody></table></div>
+            }
+        </div>
+    }
+    else if (tab == "time")
+    {
+        <div class="grid c3 mb">
+            <div class="stat"><div class="label">O'rtacha vaqt</div><div class="value">@time.AvgAll s</div><div class="sub">@time.Answered ta javob</div></div>
+            <div class="stat"><div class="label">To'g'ri javoblarda</div><div class="value">@time.AvgCorrect s</div></div>
+            <div class="stat"><div class="label">Xato javoblarda</div><div class="value">@time.AvgWrong s</div></div>
+        </div>
+        <div class="grid c2">
+            <div class="card"><div class="card-title"><h2>Qiyinlik bo'yicha</h2></div><dl class="kv">@foreach (var (k, v) in time.ByDifficulty) { <dt>@Labels.Difficulty(k)</dt><dd class="bold">@v s</dd> }</dl></div>
+            <div class="card"><div class="card-title"><h2>Eng sekin skilllar</h2></div>@if (time.BySkill.Count == 0) { <p class="muted small">Ma'lumot yo'q.</p> } else { <dl class="kv">@foreach (var (skill, avg) in time.BySkill) { <dt>@skill</dt><dd class="bold">@avg s</dd> }</dl> }</div>
+        </div>
+    }
+    else if (tab == "attendance")
+    {
+        <div class="grid c4 mb">
+            <div class="stat"><div class="label">Davomat</div><div class="value">@(att.Rate is double r ? $"{r}%" : "—")</div><div class="sub">@att.Total ta dars</div></div>
+            <div class="stat"><div class="label">Keldi</div><div class="value level-strong">@att.Present</div></div>
+            <div class="stat"><div class="label">Kelmadi</div><div class="value level-weak">@att.Absent</div></div>
+            <div class="stat"><div class="label">Kechikdi / sababli</div><div class="value level-medium">@att.Late / @att.Excused</div></div>
+        </div>
+        <div class="card pad-0">
+            @if (attendance.Count == 0) { <div class="empty"><h3>Davomat yozuvlari yo'q</h3></div> }
+            else { <div class="table-wrap"><table class="table"><thead><tr><th>Sana</th><th>Guruh</th><th>Holat</th></tr></thead><tbody>@foreach (var a in attendance) { <tr><td>@a.Date.ToString("dd.MM.yyyy")</td><td>@a.Group.Name</td><td><span class="badge @(a.Status == AttendanceStatus.Present ? "ok" : a.Status == AttendanceStatus.Absent ? "danger" : a.Status == AttendanceStatus.Late ? "warn" : "accent")">@Labels.Attendance(a.Status)@(a.Status == AttendanceStatus.Late ? $" {a.LateMinutes} min" : "")</span></td></tr> }</tbody></table></div> }
+        </div>
+    }
+    else if (tab == "homework")
+    {
+        <div class="card pad-0">
+            @if (homework.Count == 0) { <div class="empty"><h3>Uy vazifalari yo'q</h3></div> }
+            else { <div class="table-wrap"><table class="table"><thead><tr><th>Vazifa</th><th>Muddat</th><th>Holat</th><th class="num">Ball</th></tr></thead><tbody>@foreach (var h in homework) { <tr><td>@h.Homework.Title</td><td>@Tz.Fmt(h.Homework.Deadline)</td><td><span class="badge">@Labels.Submission(h.Submission?.Status ?? SubmissionStatus.NotStarted, h.Homework.Deadline)</span></td><td class="num">@(h.Submission?.Score is int s ? $"{s}/{h.Submission.MaxScore}" : "—")</td></tr> }</tbody></table></div> }
+        </div>
+    }
+}
+
+@code {
+    [Parameter, EditorRequired] public int StudentId { get; set; }
+    [Parameter] public bool Self { get; set; }
+    [Parameter] public string InitialTab { get; set; } = "overview";
+    private bool loading = true;
+    private string tab = "overview";
+    private StudentDashboard d = new();
+    private List<ScorePoint> scores = [];
+    private List<SkillStat> skills = [];
+    private List<TestAttempt> attempts = [];
+    private List<Data.PracticeSession> practices = [];
+    private List<MistakeGroup> mistakes = [];
+    private TimeStats time = new(0, 0, 0, new(), [], 0);
+    private AcademyService.AttendanceSummary att = new(0, 0, 0, 0);
+    private List<Attendance> attendance = [];
+    private List<StudentHomework> homework = [];
+    private (int Weak, int Strong, int Min) thr;
+    private readonly Dictionary<string, string> Tabs = new() { ["overview"] = "Umumiy", ["skills"] = "Skilllar", ["tests"] = "Testlar", ["mistakes"] = "Xatolar", ["time"] = "Vaqt", ["attendance"] = "Davomat", ["homework"] = "Uy vazifasi" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        tab = InitialTab;
+        d = await Analytics.DashboardAsync(StudentId);
+        scores = await Analytics.ScoresAsync(StudentId);
+        skills = await Analytics.SkillStatsAsync(StudentId);
+        attempts = await Engine.AttemptsAsync(StudentId);
+        practices = await PracticeSvc.HistoryAsync(StudentId, 30);
+        mistakes = await PracticeSvc.MistakeGroupsAsync(StudentId, null, false);
+        time = await Analytics.TimeStatsAsync(StudentId);
+        att = await Academy.AttendanceSummaryAsync(StudentId);
+        attendance = await Academy.StudentAttendanceAsync(StudentId);
+        homework = await Homework.ForStudentAsync(StudentId);
+        thr = await Analytics.ThresholdsAsync();
+        loading = false;
+    }
+}

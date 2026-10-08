@@ -1,0 +1,23 @@
+@inherits LayoutComponentBase
+@inject ToastService Toasts
+@implements IDisposable
+
+@Body
+
+<div class="toast-host">
+    @foreach (var t in Toasts.Items) { <div class="toast @t.Kind">@t.Text</div> }
+</div>
+
+<div id="blazor-error-ui" data-nosnippet>
+    Kutilmagan xatolik yuz berdi.
+    <a href="." class="reload">Qayta yuklash</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    [Inject] IJSRuntime JS { get; set; } = null!;
+    protected override void OnInitialized() => Toasts.Changed += OnToast;
+    protected override async Task OnAfterRenderAsync(bool first) { if (first) { try { await JS.InvokeVoidAsync("sat.ready"); } catch { } } }
+    private void OnToast() => InvokeAsync(StateHasChanged);
+    public void Dispose() => Toasts.Changed -= OnToast;
+}

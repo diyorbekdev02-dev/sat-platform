@@ -1,0 +1,99 @@
+@page "/tests/{TestId:int}/start"
+@attribute [Authorize(Roles = "Student")]
+@inherits AppPage
+@inject TestBuilderService Builder
+@inject TestEngineService Engine
+@inject SettingsService Settings
+
+<PageTitle>Testni boshlash</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (test is null) { <div class="empty"><h3>Test topilmadi</h3></div> }
+else
+{
+    <div class="card">
+        <h1>@test.Title</h1>
+        <p class="muted">@test.Description</p>
+
+        <h2 class="mt">Boshlashdan oldin</h2>
+        <div class="list">
+            @foreach (var c in checks)
+            {
+                <div class="list-item"><span class="badge @(c.Ok ? "ok" : "danger")">@(c.Ok ? "✓" : "✗")</span><div class="grow"><div class="title">@c.Name</div><div class="sub">@c.Detail</div></div></div>
+            }
+        </div>
+
+        <h2 class="mt">Test tuzilishi</h2>
+        <div class="list">
+            @foreach (var s in test.Modules.Select(m => m.Section).Distinct())
+            {
+                var m1 = test.Modules.First(m => m.Section == s && m.ModuleNumber == 1);
+                var count = test.Modules.Where(m => m.Section == s).Select(m => m.ModuleNumber).Distinct().Count();
+                <div class="list-item"><span class="badge @(s == Section.RW ? "rw" : "math")">@Labels.SectionShort(s)</span><div class="grow"><div class="title">@Labels.Section(s)</div><div class="sub">@count modul · har biri @Labels.Minutes(m1.TimeLimitSeconds) · @m1.Questions.Count ta savol@(test.IsAdaptive && count > 1 ? " · 2-modul 1-modul natijasiga qarab tanlanadi" : "")</div></div></div>
+                @if (s == Section.RW && test.Modules.Any(m => m.Section == Section.Math) && test.BreakSeconds > 0)
+                {
+                    <div class="list-item"><span class="badge">☕</span><div class="grow"><div class="title">Tanaffus</div><div class="sub">@Labels.Minutes(test.BreakSeconds)</div></div></div>
+                }
+            }
+        </div>
+
+        <div class="alert warn mt">⚠ Test boshlangach taymer ishga tushadi va to'xtatib bo'lmaydi. Har bir modul uchun vaqt alohida. Har bir javob avtomatik saqlanadi — internet uzilsa ham javoblaringiz yo'qolmaydi. Test faqat bitta oynada ochiq bo'lishi kerak.</div>
+        @if (Error is not null) { <div class="alert danger">@Error</div> }
+        <div class="row end mt">
+            <a class="btn" href="/tests">Bekor qilish</a>
+            <button class="btn primary lg" @onclick="StartAsync" disabled="@(busy || !checks.Where(c => c.Critical).All(c => c.Ok))"><Icon Name="play" /> Testni boshlash</button>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int TestId { get; set; }
+    [SupplyParameterFromQuery(Name = "assignment")] public int? AssignmentId { get; set; }
+    private Test? test;
+    private bool busy;
+    private record Check(string Name, string Detail, bool Ok, bool Critical);
+    private List<Check> checks = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Testni boshlash", narrow: true);
+        test = await Builder.GetAsync(TestId);
+        if (test is not null && test.Status != TestStatus.Published) test = null;
+        Loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (!first || test is null) return;
+        try
+        {
+            var d = await JS.InvokeAsync<System.Text.Json.JsonElement>("sat.deviceCheck");
+            var online = d.GetProperty("online").GetBoolean();
+            var width = d.GetProperty("width").GetInt32();
+            var ls = d.GetProperty("localStorage").GetBoolean();
+            var cookies = d.GetProperty("cookies").GetBoolean();
+            checks =
+            [
+                new("Internet", online ? "Ulanish bor" : "Internet yo'q", online, true),
+                new("Brauzer", "Qo'llab-quvvatlanadi", true, true),
+                new("Ekran", width >= 900 ? $"{width}px — mos" : $"{width}px — test desktop/planshet uchun mo'ljallangan; mobilda ishlash mumkin, lekin noqulay", width >= 600, false),
+                new("Lokal saqlash", ls ? "Mavjud (javoblar zaxiralanadi)" : "Mavjud emas — maxfiy rejimdan chiqing", ls, true),
+                new("Sessiya", cookies ? "Tayyor" : "Cookie o'chirilgan", cookies, true),
+            ];
+            StateHasChanged();
+        }
+        catch { checks = [new("Brauzer", "Tekshirib bo'lmadi, davom etish mumkin", true, false)]; StateHasChanged(); }
+    }
+
+    private async Task StartAsync()
+    {
+        busy = true; Error = null;
+        try
+        {
+            var sid = await Me.StudentIdAsync() ?? 0;
+            var attempt = await Engine.StartAsync(sid, TestId, AssignmentId);
+            Nav.NavigateTo($"/attempt/{attempt.Id}");
+        }
+        catch (AppException ex) { Error = ex.Message; busy = false; }
+    }
+}

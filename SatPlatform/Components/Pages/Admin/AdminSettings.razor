@@ -1,0 +1,171 @@
+@page "/admin/settings"
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inherits AppPage
+@inject SettingsService Settings
+@inject ScoringService Scoring
+@inject ContentService Content
+@inject AuditService Audit
+
+<PageTitle>Sozlamalar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="tabs">@foreach (var t in new[] { ("general", "Umumiy"), ("adaptive", "Adaptiv qoidalar"), ("scoring", "Scoring jadvali"), ("taxonomy", "Domain va skilllar") }) { <button class="tab @(tab == t.Item1 ? "active" : "")" @onclick="() => tab = t.Item1">@t.Item2</button> }</div>
+
+    @if (tab == "general")
+    {
+        <div class="card" style="max-width:720px">
+            <h2>Umumiy sozlamalar</h2>
+            <label class="lbl">O'quv markaz nomi</label><input class="input" @bind="values[SettingKeys.CenterName]" />
+            <div class="form-row">
+                <div><label class="lbl">Zaif skill chegarasi (%)</label><input class="input" type="number" @bind="values[SettingKeys.WeakThreshold]" /></div>
+                <div><label class="lbl">Kuchli skill chegarasi (%)</label><input class="input" type="number" @bind="values[SettingKeys.StrongThreshold]" /></div>
+                <div><label class="lbl">Skill baholash uchun minimal savollar</label><input class="input" type="number" @bind="values[SettingKeys.MinSkillSample]" /></div>
+                <div><label class="lbl">Tanaffus (soniya)</label><input class="input" type="number" @bind="values[SettingKeys.BreakSeconds]" /></div>
+                <div><label class="lbl">R&W modul vaqti (soniya)</label><input class="input" type="number" @bind="values[SettingKeys.RwModuleSeconds]" /></div>
+                <div><label class="lbl">Math modul vaqti (soniya)</label><input class="input" type="number" @bind="values[SettingKeys.MathModuleSeconds]" /></div>
+                <div><label class="lbl">Tavsiya qilingan savollar soni</label><input class="input" type="number" @bind="values[SettingKeys.RecommendedQuestionCount]" /></div>
+                <div><label class="lbl">Mashq eslatmasi soati (Toshkent)</label><input class="input" type="number" min="0" max="23" @bind="values[SettingKeys.PracticeReminderHour]" /></div>
+                <div><label class="lbl">Standart scoring versiyasi</label><select class="input" @bind="values[SettingKeys.DefaultScoringVersion]">@foreach (var v in versions) { <option value="@v">@v</option> }</select></div>
+                <div><label class="lbl">Mustaqil ro'yxatdan o'tish</label><select class="input" @bind="values[SettingKeys.AllowSelfRegistration]"><option value="true">Ruxsat berilgan</option><option value="false">Faqat admin qo'shadi</option></select></div>
+            </div>
+            <button class="btn primary mt" @onclick="SaveGeneralAsync">Saqlash</button>
+        </div>
+    }
+    else if (tab == "adaptive")
+    {
+        <div class="card" style="max-width:720px">
+            <h2>Adaptiv routing</h2>
+            <p class="small muted">Module 1 dagi to'g'ri javoblar soni cutoff dan katta yoki teng bo'lsa — Hard, aks holda Easy. Modul savollari soni qoidadagidan farq qilsa, cutoff proporsional o'lchanadi.</p>
+            @foreach (var r in rules)
+            {
+                <div class="form-row mt">
+                    <div><label class="lbl">@Labels.Section(r.Section) · savollar</label><input class="input" type="number" @bind="r.QuestionCount" /></div>
+                    <div><label class="lbl">Cutoff (to'g'ri javoblar)</label><input class="input" type="number" @bind="r.Cutoff" /></div>
+                    <div><label class="lbl">Past natija →</label><select class="input" @bind="r.LowRoute"><option value="Easy">Easy</option><option value="Hard">Hard</option></select></div>
+                    <div><label class="lbl">Yuqori natija →</label><select class="input" @bind="r.HighRoute"><option value="Hard">Hard</option><option value="Easy">Easy</option></select></div>
+                </div>
+            }
+            <button class="btn primary mt" @onclick="SaveRulesAsync">Saqlash</button>
+        </div>
+    }
+    else if (tab == "scoring")
+    {
+        <div class="card">
+            <div class="row between mb">
+                <div class="row"><h2>Scoring jadvali</h2><select class="input sm" @bind="version" @bind:after="LoadEntriesAsync">@foreach (var v in versions) { <option value="@v">@v</option> }</select><input class="input sm" style="width:160px" placeholder="yangi versiya nomi" @bind="newVersion" /><button class="btn sm" @onclick="CreateVersion" disabled="@(string.IsNullOrWhiteSpace(newVersion))">Yangi versiya</button></div>
+                <div class="row"><select class="input sm" @bind="editSection"><option value="0">R&W</option><option value="1">Math</option></select><select class="input sm" @bind="editRoute"><option value="Hard">Hard route</option><option value="Easy">Easy route</option><option value="Standard">Standard (adaptiv emas)</option></select><button class="btn sm" @onclick="LoadEditor">Tahrirlash</button></div>
+            </div>
+            <p class="small muted">Raw ball (to'g'ri javoblar) → scaled ball (200–800). Jadval biznes tomonidan tasdiqlangan qiymatlar bilan to'ldirilishi kerak. Boshlang'ich jadval Bluebook amaliy testlari egri chizig'iga yaqinlashtirilgan.</p>
+            @if (editorOpen)
+            {
+                <div class="alert"><b>@Labels.Section((Section)editSection) · @editRoute</b> — har qatorda <code>raw,scaled</code>:</div>
+                <textarea class="input" style="min-height:240px;font-family:monospace" @bind="editorText"></textarea>
+                <div class="row mt-s"><button class="btn primary" @onclick="SaveTableAsync">Jadvalni saqlash</button><button class="btn" @onclick="() => editorOpen = false">Yopish</button></div>
+            }
+            <div class="table-wrap mt"><table class="table"><thead><tr><th>Raw</th>@foreach (var c in Columns) { <th class="num">@c.Label</th> }</tr></thead>
+                <tbody>@for (var raw = 0; raw <= MaxRaw; raw++) { var r = raw; <tr><td class="bold">@r</td>@foreach (var c in Columns) { var e = entries.FirstOrDefault(x => x.Section == c.Section && x.Route == c.Route && x.RawScore == r); <td class="num">@(e?.ScaledScore.ToString() ?? "—")</td> }</tr> }</tbody></table></div>
+        </div>
+    }
+    else
+    {
+        <div class="grid c2">
+            @foreach (var sec in new[] { Section.RW, Section.Math })
+            {
+                <div class="card">
+                    <div class="card-title"><h2>@Labels.Section(sec)</h2><button class="btn sm" @onclick="() => newDomain = new Domain { Section = sec }"><Icon Name="plus" /> Domain</button></div>
+                    @foreach (var d in domains.Where(d => d.Section == sec))
+                    {
+                        <div class="mt-s">
+                            <div class="row between"><b>@d.Name</b> <span class="tiny muted">@d.Code</span><div class="row"><button class="btn sm" @onclick="() => newSkill = new Skill { DomainId = d.Id }"><Icon Name="plus" Size="14" /> skill</button><button class="btn sm" @onclick="() => editDomain = new Domain { Id = d.Id, Name = d.Name, Code = d.Code, Section = d.Section, SortOrder = d.SortOrder, IsActive = d.IsActive }"><Icon Name="pencil" Size="14" /></button></div></div>
+                            <div class="chips mt-s">@foreach (var s in d.Skills) { <button class="chip @(s.IsActive ? "" : "muted")" title="@s.Code" @onclick="() => editSkill = new Skill { Id = s.Id, Name = s.Name, Code = s.Code, DomainId = s.DomainId, SortOrder = s.SortOrder, IsActive = s.IsActive }">@s.Name@(s.IsActive ? "" : " (nofaol)")</button> }</div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <Modal Open="newDomain is not null || editDomain is not null" OpenChanged="v => { if (!v) { newDomain = null; editDomain = null; } }" Title="Domain">
+            @{ var d = editDomain ?? newDomain; }
+            @if (d is not null)
+            {
+                <label class="lbl">Nomi</label><input class="input" @bind="d.Name" />
+                <label class="lbl">Kod (ixtiyoriy)</label><input class="input" @bind="d.Code" />
+                <label class="lbl">Tartib</label><input class="input" type="number" @bind="d.SortOrder" />
+                @if (d.Id > 0) { <label class="check mt-s"><input type="checkbox" @bind="d.IsActive" /> Faol</label> }
+                <div class="modal-actions"><button class="btn primary" @onclick="() => SaveDomainAsync(d)">Saqlash</button></div>
+            }
+        </Modal>
+        <Modal Open="newSkill is not null || editSkill is not null" OpenChanged="v => { if (!v) { newSkill = null; editSkill = null; } }" Title="Skill">
+            @{ var s = editSkill ?? newSkill; }
+            @if (s is not null)
+            {
+                <label class="lbl">Nomi</label><input class="input" @bind="s.Name" />
+                <label class="lbl">Kod (ixtiyoriy)</label><input class="input" @bind="s.Code" />
+                <label class="lbl">Domain</label><select class="input" @bind="s.DomainId">@foreach (var d2 in domains) { <option value="@d2.Id">@d2.Name</option> }</select>
+                <label class="lbl">Tartib</label><input class="input" type="number" @bind="s.SortOrder" />
+                @if (s.Id > 0) { <label class="check mt-s"><input type="checkbox" @bind="s.IsActive" /> Faol</label> }
+                <div class="modal-actions"><button class="btn primary" @onclick="() => SaveSkillAsync(s)">Saqlash</button></div>
+            }
+        </Modal>
+    }
+}
+
+@code {
+    private string tab = "general";
+    private Dictionary<string, string> values = new();
+    private List<AdaptiveRule> rules = [];
+    private List<string> versions = [];
+    private string version = "", newVersion = "", editorText = "", editRoute = "Hard";
+    private int editSection;
+    private bool editorOpen;
+    private List<ScoringEntry> entries = [];
+    private List<Domain> domains = [];
+    private Domain? newDomain, editDomain;
+    private Skill? newSkill, editSkill;
+    private record Col(Section Section, ModuleRoute Route, string Label);
+    private List<Col> Columns => [new(Section.RW, ModuleRoute.Hard, "R&W Hard"), new(Section.RW, ModuleRoute.Easy, "R&W Easy"), new(Section.RW, ModuleRoute.Standard, "R&W Std"), new(Section.Math, ModuleRoute.Hard, "Math Hard"), new(Section.Math, ModuleRoute.Easy, "Math Easy"), new(Section.Math, ModuleRoute.Standard, "Math Std")];
+    private int MaxRaw => entries.Count == 0 ? 54 : entries.Max(e => e.RawScore);
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Sozlamalar");
+        values = new Dictionary<string, string>(await Settings.AllAsync());
+        rules = await Scoring.RulesAsync();
+        versions = await Scoring.VersionsAsync();
+        version = values.GetValueOrDefault(SettingKeys.DefaultScoringVersion, versions.FirstOrDefault() ?? "");
+        if (!versions.Contains(version)) version = versions.FirstOrDefault() ?? version;
+        await LoadEntriesAsync();
+        domains = await Content.DomainsAsync(includeInactive: true);
+        Loading = false;
+    }
+
+    private async Task SaveGeneralAsync()
+    {
+        foreach (var (k, v) in values) await Settings.SetAsync(k, v);
+        Scoring.Invalidate();
+        await Audit.LogAsync(await Me.IdAsync(), "SettingsChanged", "AppSetting", null, string.Join(";", values.Select(kv => $"{kv.Key}={kv.Value}")));
+        Toasts.Ok("Saqlandi");
+    }
+    private async Task SaveRulesAsync() { foreach (var r in rules) await Scoring.SaveRuleAsync(r); await Audit.LogAsync(await Me.IdAsync(), "AdaptiveRulesChanged", "AdaptiveRule", null); Toasts.Ok("Saqlandi"); }
+    private async Task LoadEntriesAsync() => entries = await Scoring.EntriesAsync(version);
+    private void CreateVersion() { var v = newVersion.Trim().ToUpperInvariant().Replace(' ', '_'); if (!versions.Contains(v)) versions.Add(v); version = v; newVersion = ""; entries = []; }
+    private void LoadEditor()
+    {
+        var route = Enum.Parse<ModuleRoute>(editRoute);
+        var rows = entries.Where(e => e.Section == (Section)editSection && e.Route == route).OrderBy(e => e.RawScore).Select(e => $"{e.RawScore},{e.ScaledScore}").ToList();
+        if (rows.Count == 0) rows = ScoringService.DefaultTable(version).Where(e => e.Section == (Section)editSection && e.Route == route).Select(e => $"{e.RawScore},{e.ScaledScore}").ToList();
+        editorText = string.Join("\n", rows); editorOpen = true;
+    }
+    private async Task SaveTableAsync()
+    {
+        var parsed = ScoringService.ParseTable(editorText);
+        if (parsed.Count == 0) { Toasts.Error("Jadval bo'sh yoki noto'g'ri formatda."); return; }
+        await Scoring.SaveEntriesAsync(version, (Section)editSection, Enum.Parse<ModuleRoute>(editRoute), parsed);
+        await Audit.LogAsync(await Me.IdAsync(), "ScoringTableChanged", "ScoringEntry", null, $"{version} {(Section)editSection} {editRoute} {parsed.Count} rows");
+        if (!versions.Contains(version)) versions.Add(version);
+        await LoadEntriesAsync(); Toasts.Ok("Jadval saqlandi"); editorOpen = false;
+    }
+    private async Task SaveDomainAsync(Domain d) { var err = await Content.SaveDomainAsync(d); if (err is not null) { Toasts.Error(err); return; } newDomain = null; editDomain = null; domains = await Content.DomainsAsync(includeInactive: true); Toasts.Ok("Saqlandi"); }
+    private async Task SaveSkillAsync(Skill s) { var err = await Content.SaveSkillAsync(s); if (err is not null) { Toasts.Error(err); return; } newSkill = null; editSkill = null; domains = await Content.DomainsAsync(includeInactive: true); Toasts.Ok("Saqlandi"); }
+}

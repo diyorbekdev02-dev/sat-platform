@@ -1,0 +1,159 @@
+@page "/register"
+@layout EmptyLayout
+@inherits AppPage
+@inject AuthService Auth
+@inject SettingsService Settings
+@implements IDisposable
+
+<PageTitle>Ro'yxatdan o'tish — SAT Platform</PageTitle>
+
+<div class="auth-screen">
+    <div class="auth-card">
+        <div class="auth-brand">
+            <div class="brand-mark">SAT</div>
+            <div><h2>@centerName</h2><div class="sub">Digital SAT tayyorlov platformasi</div></div>
+        </div>
+        <div class="auth-form">
+            <div class="auth-tabs">
+                <button class="auth-tab" @onclick="@(() => Nav.NavigateTo("/login"))">Kirish</button>
+                <button class="auth-tab active">Ro'yxatdan o'tish</button>
+            </div>
+
+            @if (step == 1)
+            {
+                <h1>Ro'yxatdan o'tish</h1>
+                <p class="muted small">Telefon raqamingizni kiriting — tasdiqlash kodi Telegram botga keladi. Telegram'ning o'zida ham ro'yxatdan o'tish mumkin: botga kirib raqamingizni yuboring.</p>
+                <div class="role-pick">
+                    <button class="@(role == UserRole.Student ? "active" : "")" @onclick="() => role = UserRole.Student">🎓 O'quvchi<span class="sub">Test va mashq ishlayman</span></button>
+                    <button class="@(role == UserRole.Parent ? "active" : "")" @onclick="() => role = UserRole.Parent">👨‍👩‍👧 Ota-ona<span class="sub">Farzandim natijasini ko'raman</span></button>
+                </div>
+                <label class="lbl">Telefon raqam</label>
+                <input class="input phone-input" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" @bind="phone" @bind:event="oninput" @onkeydown="@(e => { if (e.Key == "Enter") _ = RequestCodeAsync(); })" autofocus />
+                @if (Error is not null) { <div class="error">@Error</div> }
+                <button class="btn primary lg full mt" @onclick="RequestCodeAsync" disabled="@busy">Davom etish</button>
+                @if (botUser is not null)
+                {
+                    <a class="btn telegram full mt-s" href="https://t.me/@botUser" target="_blank"><Icon Name="telegram" /> Telegram bot orqali ro'yxatdan o'tish</a>
+                }
+            }
+            else if (step == 2)
+            {
+                <h1>Kodni kiriting</h1>
+                @if (devCode is not null)
+                {
+                    <div class="alert warn"><div class="small bold">Sinov rejimi (Telegram bot ulanmagan)</div><div class="dev-code">@devCode</div></div>
+                }
+                else if (deepLink is not null && !delivered)
+                {
+                    <div class="alert">
+                        <div class="steps">
+                            <div><span class="step-n">1</span><span>Telegram botni oching va <b>Start</b> ni bosing</span></div>
+                            <div><span class="step-n">2</span><span>«Telefon raqamni yuborish» tugmasini bosing</span></div>
+                            <div><span class="step-n">3</span><span>Kod botga keladi — shu yerga kiriting</span></div>
+                        </div>
+                        <a class="btn telegram full mt-s" href="@deepLink" target="_blank"><Icon Name="telegram" /> Telegram botni ochish</a>
+                        <div class="row small muted mt-s"><span class="spinner"></span> Kod kelishini kutmoqdamiz...</div>
+                    </div>
+                }
+                else { <p class="muted small">Kod Telegram'ga yuborildi: <b>@AuthService.NormalizePhone(phone)</b></p> }
+                <input class="input code-input" inputmode="numeric" maxlength="5" placeholder="•••••" @bind="code" @bind:event="oninput" @onkeydown="@(e => { if (e.Key == "Enter") _ = CheckCodeAsync(); })" />
+                @if (Error is not null) { <div class="error">@Error</div> }
+                <button class="btn primary lg full mt" @onclick="CheckCodeAsync" disabled="@(busy || code.Length < 5)">Tasdiqlash</button>
+                <div class="auth-links">
+                    <button class="link-btn" @onclick="() => { step = 1; Error = null; }">← Raqamni o'zgartirish</button>
+                    <button class="link-btn" @onclick="RequestCodeAsync" disabled="@busy">Kodni qayta yuborish</button>
+                </div>
+            }
+            else
+            {
+                <h1>Profil</h1>
+                <label class="lbl">Ism-familiya</label>
+                <input class="input" @bind="fullName" @bind:event="oninput" placeholder="Ali Valiyev" autofocus />
+                <label class="lbl">Parol</label>
+                <input class="input" type="password" @bind="password" @bind:event="oninput" placeholder="Kamida 6 ta belgi" />
+                <label class="lbl">Parolni takrorlang</label>
+                <input class="input" type="password" @bind="password2" @bind:event="oninput" @onkeydown="@(e => { if (e.Key == "Enter") _ = RegisterAsync(); })" />
+                @if (role == UserRole.Student)
+                {
+                    <label class="lbl">Maqsad ball (ixtiyoriy)</label>
+                    <input class="input" type="number" min="400" max="1600" step="10" @bind="targetScore" placeholder="masalan 1400" />
+                }
+                else
+                {
+                    <label class="lbl">Farzandingizning ota-ona kodi</label>
+                    <input class="input" style="text-transform:uppercase;letter-spacing:.15em" @bind="childCode" @bind:event="oninput" placeholder="ABC123" maxlength="8" />
+                    <div class="hint">Kod o'quvchining Profil sahifasida ko'rsatiladi.</div>
+                }
+                @if (Error is not null) { <div class="error">@Error</div> }
+                <button class="btn primary lg full mt" @onclick="RegisterAsync" disabled="@busy">Ro'yxatdan o'tish</button>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private int step = 1;
+    private UserRole role = UserRole.Student;
+    private string phone = "+998 ", code = "", fullName = "", password = "", password2 = "", childCode = "", centerName = "SAT Center";
+    private int? targetScore;
+    private string? devCode, deepLink, botUser;
+    private bool busy, delivered;
+    private System.Threading.Timer? poll;
+
+    protected override async Task OnInitializedAsync()
+    {
+        centerName = await Settings.GetAsync(SettingKeys.CenterName);
+        botUser = Auth.BotConfigured ? Auth.BotUsername : null;
+    }
+
+    private async Task RequestCodeAsync()
+    {
+        if (busy) return;
+        busy = true; Error = null; devCode = null; deepLink = null; delivered = false;
+        try
+        {
+            var r = await Auth.RequestCodeAsync(phone, "register");
+            if (r.Error is not null) { Error = r.Error; if (r.DeepLink is null) return; }
+            devCode = r.DevCode; deepLink = r.DeepLink; delivered = r.Delivery == CodeDelivery.Telegram;
+            step = 2;
+            if (deepLink is not null && !delivered) poll = new System.Threading.Timer(async _ => await PollAsync(), null, 3000, 3000);
+        }
+        finally { busy = false; }
+    }
+
+    private async Task PollAsync()
+    {
+        var s = await Auth.GetCodeStatusAsync(phone);
+        if (s.Delivered) { delivered = true; poll?.Dispose(); poll = null; await InvokeAsync(StateHasChanged); }
+    }
+
+    private async Task CheckCodeAsync()
+    {
+        if (busy) return;
+        busy = true; Error = null;
+        try
+        {
+            var err = await Auth.CheckCodeAsync(phone, code, consume: false);
+            if (err is not null) { Error = err; return; }
+            step = 3;
+        }
+        finally { busy = false; }
+    }
+
+    private async Task RegisterAsync()
+    {
+        if (busy) return;
+        if (password != password2) { Error = "Parollar mos kelmadi."; return; }
+        busy = true; Error = null;
+        try
+        {
+            var r = await Auth.RegisterAsync(new AuthService.RegisterRequest(phone, code, fullName, password, role, targetScore, childCode));
+            if (r.Error is not null) { Error = r.Error; return; }
+            var token = await Auth.IssueLoginTokenAsync(r.User!.Id, role == UserRole.Student ? "/dashboard?welcome=1" : null);
+            Nav.NavigateTo($"/auth/token?t={token}", forceLoad: true);
+        }
+        finally { busy = false; }
+    }
+
+    public void Dispose() => poll?.Dispose();
+}

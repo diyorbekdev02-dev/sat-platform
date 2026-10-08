@@ -1,0 +1,26 @@
+@* Skill accuracy list ("heatmap"). *@
+@if (Stats.Count == 0)
+{
+    <div class="empty"><h3>Hali ma'lumot yo'q</h3><p class="small">Test yoki mashq ishlagandan so'ng skill bo'yicha aniqlik shu yerda ko'rinadi.</p></div>
+}
+else
+{
+    @foreach (var group in Stats.GroupBy(s => (s.Section, s.Domain)))
+    {
+        <div class="small bold muted mt-s" style="margin-bottom:4px">
+            <span class="badge @(group.Key.Section == Section.RW ? "rw" : "math")">@Labels.SectionShort(group.Key.Section)</span> @group.Key.Domain
+        </div>
+        @foreach (var s in group)
+        {
+            <div class="skill-row" title="@s.Correct / @s.Attempted to'g'ri · o'rtacha @s.AvgTime s">
+                <span class="name">@s.Skill <span class="tiny muted">(@s.Attempted)</span></span>
+                <div class="progress @s.Level"><span style="width:@(s.Accuracy)%"></span></div>
+                <span class="pct level-@s.Level">@s.Accuracy.ToString("0")%</span>
+            </div>
+        }
+    }
+}
+
+@code {
+    [Parameter] public List<SkillStat> Stats { get; set; } = [];
+}

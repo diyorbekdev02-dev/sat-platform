@@ -1,0 +1,11 @@
+@page "/"
+@inject CurrentUser Me
+@inject NavigationManager Nav
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var role = await Me.RoleAsync();
+        Nav.NavigateTo(role is UserRole r ? AuthService.HomeFor(r) : "/login", replace: true);
+    }
+}

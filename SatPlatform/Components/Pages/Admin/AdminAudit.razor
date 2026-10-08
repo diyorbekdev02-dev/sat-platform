@@ -1,0 +1,24 @@
+@page "/admin/audit"
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+
+<PageTitle>Audit jurnali</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="row mb"><select class="input sm" @bind="action" @bind:after="LoadAsync"><option value="">Barcha amallar</option>@foreach (var a in actions) { <option value="@a">@a</option> }</select></div>
+    <div class="card pad-0"><div class="table-wrap"><table class="table">
+        <thead><tr><th>Vaqt</th><th>Kim</th><th>Amal</th><th>Obyekt</th><th>Tafsilot</th></tr></thead>
+        <tbody>@foreach (var a in list) { <tr><td>@Tz.Fmt(a.CreatedAt, "dd.MM.yyyy HH:mm:ss")</td><td>@(a.UserId is int u && names.TryGetValue(u, out var n) ? n : "tizim")</td><td><span class="badge">@a.Action</span></td><td>@a.EntityType #@a.EntityId</td><td class="small" style="max-width:480px;word-break:break-word">@a.Details</td></tr> }</tbody></table></div></div>
+}
+
+@code {
+    private List<AuditLog> list = [];
+    private Dictionary<int, string> names = new();
+    private string action = "";
+    private static readonly string[] actions = ["QuestionCreated", "QuestionUpdated", "QuestionArchived", "QuestionDeleted", "TestCreated", "TestUpdated", "TestPublished", "TestArchived", "TestAssigned", "StudentCreated", "UserCreated", "UserUpdated", "UserRegistered", "StudentGroupChanged", "AttendanceChanged", "ScoreRecalculated", "AttemptScored", "SettingsChanged", "ScoringTableChanged", "AdaptiveRulesChanged", "HomeworkCreated", "GroupCreated", "GroupUpdated"];
+    protected override async Task OnInitializedAsync() { SetTitle("Audit jurnali"); await LoadAsync(); Loading = false; }
+    private async Task LoadAsync() { list = await Academy.AuditAsync(300, action == "" ? null : action); names = await Academy.UserNamesAsync(list.Where(a => a.UserId is not null).Select(a => a.UserId!.Value)); }
+}

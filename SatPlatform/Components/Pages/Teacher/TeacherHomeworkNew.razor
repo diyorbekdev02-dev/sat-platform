@@ -1,0 +1,106 @@
+@page "/teacher/homework/new"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+@inject HomeworkService HomeworkSvc
+@inject ContentService Content
+@inject TestBuilderService Builder
+@inject MediaService Media
+
+<PageTitle>Yangi uy vazifasi</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="card">
+        <h2>Yangi uy vazifasi</h2>
+        <label class="lbl">Sarlavha</label>
+        <input class="input" @bind="h.Title" placeholder="masalan: Algebra mashqi" />
+        <label class="lbl">Tavsif (ixtiyoriy)</label>
+        <textarea class="input" @bind="h.Description" rows="3"></textarea>
+        <label class="lbl">Kimga</label>
+        <div class="chips"><button class="chip @(target == "group" ? "active" : "")" @onclick="@(() => target = "group")">Guruh</button><button class="chip @(target == "student" ? "active" : "")" @onclick="@(() => target = "student")">Alohida o'quvchi</button></div>
+        @if (target == "group") { <select class="input mt-s" @bind="groupId"><option value="0">— guruh —</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select> }
+        else { <select class="input mt-s" @bind="studentId"><option value="0">— o'quvchi —</option>@foreach (var s in students) { <option value="@s.Id">@s.User.FullName</option> }</select> }
+        <label class="lbl">Vazifa turi</label>
+        <div class="chips">
+            <button class="chip @(h.Kind == HomeworkKind.Practice ? "active" : "")" @onclick="() => h.Kind = HomeworkKind.Practice">Savollar (mashq)</button>
+            <button class="chip @(h.Kind == HomeworkKind.Test ? "active" : "")" @onclick="() => h.Kind = HomeworkKind.Test">Test</button>
+            <button class="chip @(h.Kind == HomeworkKind.File ? "active" : "")" @onclick="() => h.Kind = HomeworkKind.File">Fayl / matn topshirish</button>
+        </div>
+        @if (h.Kind == HomeworkKind.Practice)
+        {
+            <div class="form-row">
+                <div><label class="lbl">Bo'lim</label><select class="input" @bind="section" @bind:after="() => { h.DomainId = null; h.SkillId = null; }"><option value="">Hammasi</option><option value="0">Reading & Writing</option><option value="1">Math</option></select></div>
+                <div><label class="lbl">Domain</label><select class="input" @bind="h.DomainId" @bind:after="() => h.SkillId = null"><option value="">Hammasi</option>@foreach (var d in domains.Where(d => section == "" || (int)d.Section == int.Parse(section))) { <option value="@d.Id">@d.Name</option> }</select></div>
+                <div><label class="lbl">Skill</label><select class="input" @bind="h.SkillId"><option value="">Hammasi</option>@foreach (var s in domains.Where(d => h.DomainId is null || d.Id == h.DomainId).Where(d => section == "" || (int)d.Section == int.Parse(section)).SelectMany(d => d.Skills)) { <option value="@s.Id">@s.Name</option> }</select></div>
+                <div><label class="lbl">Qiyinlik</label><select class="input" @bind="h.Difficulty"><option value="">Aralash</option>@foreach (var d in Enum.GetValues<Difficulty>()) { <option value="@d">@Labels.Difficulty(d)</option> }</select></div>
+                <div><label class="lbl">Savollar soni</label><input class="input" type="number" min="1" max="60" @bind="h.QuestionCount" /></div>
+            </div>
+        }
+        else if (h.Kind == HomeworkKind.Test)
+        {
+            <label class="lbl">Test</label>
+            <select class="input" @bind="h.TestId"><option value="">— tanlang —</option>@foreach (var t in tests) { <option value="@t.Id">@t.Title</option> }</select>
+            <div class="hint">O'quvchiga test 1 urinish bilan tayinlanadi; yakunlangach natija vazifaga yoziladi.</div>
+        }
+        else
+        {
+            <label class="lbl">Vazifa fayli (ixtiyoriy)</label>
+            <div class="drop"><InputFile OnChange="e => file = e.File" /> @(file?.Name ?? "Faylni tanlang")</div>
+        }
+        <label class="lbl">Muddat</label>
+        <input class="input" type="datetime-local" @bind="deadline" />
+        @if (Error is not null) { <div class="alert danger mt">@Error</div> }
+        <div class="row end mt"><a class="btn" href="/teacher/homework">Bekor</a><button class="btn primary" @onclick="SaveAsync" disabled="@busy"><Icon Name="check" /> Vazifa berish</button></div>
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery(Name = "group")] public int? QGroup { get; set; }
+    [SupplyParameterFromQuery(Name = "student")] public int? QStudent { get; set; }
+    private readonly Homework h = new() { Kind = HomeworkKind.Practice, QuestionCount = 20 };
+    private List<Group> groups = [];
+    private List<Data.Student> students = [];
+    private List<Domain> domains = [];
+    private List<TestRow> tests = [];
+    private string target = "group", section = "";
+    private int groupId, studentId;
+    private DateTime deadline = Tz.ToLocal(DateTime.UtcNow).AddDays(3).Date.AddHours(23).AddMinutes(59);
+    private IBrowserFile? file;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Yangi uy vazifasi", narrow: true);
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        groups = await Academy.GroupsAsync(await Academy.GroupScopeAsync(uid, role));
+        students = await Academy.StudentsAsync(StudentStatus.Active, ids: await Academy.StudentScopeAsync(uid, role));
+        domains = await Content.DomainsAsync();
+        tests = await Builder.ListAsync(TestStatus.Published);
+        if (QGroup is int g) groupId = g;
+        if (QStudent is int s) { studentId = s; target = "student"; }
+        Loading = false;
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true; Error = null;
+        h.GroupId = target == "group" && groupId > 0 ? groupId : null;
+        h.StudentId = target == "student" && studentId > 0 ? studentId : null;
+        h.Section = section == "" ? null : (Section)int.Parse(section);
+        h.Deadline = Tz.ToUtc(deadline);
+        if (file is not null)
+        {
+            await using var stream = file.OpenReadStream(MediaService.MaxSize);
+            var (_, id, err) = await Media.UploadAsync(stream, file.Name, file.ContentType, file.Size, await Me.IdAsync(), false);
+            if (err is not null) { Error = err; busy = false; return; }
+            h.FileId = id;
+        }
+        var (hid, e2) = await HomeworkSvc.CreateAsync(h, await Me.IdAsync());
+        busy = false;
+        if (e2 is not null) { Error = e2; return; }
+        Toasts.Ok("Vazifa berildi");
+        Nav.NavigateTo($"/teacher/homework/{hid}");
+    }
+}

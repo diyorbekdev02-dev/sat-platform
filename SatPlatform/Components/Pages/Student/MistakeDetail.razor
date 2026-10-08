@@ -1,0 +1,31 @@
+@page "/mistakes/{QuestionId:int}"
+@attribute [Authorize(Roles = "Student")]
+@inherits AppPage
+@inject PracticeService PracticeSvc
+
+<PageTitle>Xato</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (detail is null) { <div class="empty"><h3>Topilmadi</h3></div> }
+else
+{
+    var (m, v) = detail.Value;
+    <div class="row between mb">
+        <div class="row"><span class="badge @(m.Question.Section == Section.RW ? "rw" : "math")">@Labels.SectionShort(m.Question.Section)</span><span class="badge">@m.Question.Skill.Domain.Name</span><span class="badge">@m.Question.Skill.Name</span><span class="badge">@Labels.Difficulty(m.Question.Difficulty)</span><span class="badge danger">@m.MistakeCount marta xato</span><span class="badge @(m.IsResolved ? "ok" : "")">@(m.IsResolved ? "Hal qilingan" : "Hal qilinmagan")</span></div>
+        <a class="btn sm" href="/mistakes">← Xatolarim</a>
+    </div>
+    <div class="card">
+        <div class="small muted mb-s">Sizning oxirgi javobingiz: <b>@(m.LastAnswer ?? "—")</b> · @Tz.Fmt(m.LastWrongAt)</div>
+        <QuestionView Version="v" Mode="QuestionView.QuestionMode.Review" Answer="@m.LastAnswer" IsCorrect="false" />
+        <div class="row mt">
+            <a class="btn primary" href="/practice/new?skill=@m.SkillId&count=10"><Icon Name="target" /> Shu skillni mashq qilish</a>
+            <a class="btn" href="/practice/new?mode=@((int)PracticeMode.Mistake)"><Icon Name="x-circle" /> Barcha xatolar ustida</a>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public int QuestionId { get; set; }
+    private (StudentMistake, QuestionVersion)? detail;
+    protected override async Task OnInitializedAsync() { SetTitle("Xatoni ko'rish", narrow: true); detail = await PracticeSvc.MistakeDetailAsync(await Me.StudentIdAsync() ?? 0, QuestionId); Loading = false; }
+}

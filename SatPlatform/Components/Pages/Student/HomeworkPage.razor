@@ -1,0 +1,97 @@
+@page "/homework"
+@attribute [Authorize(Roles = "Student")]
+@inherits AppPage
+@inject HomeworkService HomeworkSvc
+@inject MediaService Media
+
+<PageTitle>Uy vazifasi</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (list.Count == 0) { <div class="card"><div class="empty"><div class="big">📋</div><h3>Uy vazifalari yo'q</h3><p class="small">O'qituvchingiz vazifa bersa, shu yerda ko'rinadi.</p></div></div> }
+else
+{
+    <div class="stack">
+        @foreach (var h in list)
+        {
+            var sub = h.Submission; var hw = h.Homework;
+            var overdue = hw.Deadline < DateTime.UtcNow && sub?.Status is SubmissionStatus.NotStarted or SubmissionStatus.InProgress;
+            <div class="card">
+                <div class="row between">
+                    <div>
+                        <div class="row"><h2>@hw.Title</h2><span class="badge @(sub?.Status == SubmissionStatus.Reviewed ? "ok" : sub?.Status == SubmissionStatus.Submitted ? "accent" : overdue ? "danger" : "")">@Labels.Submission(sub?.Status ?? SubmissionStatus.NotStarted, hw.Deadline)</span></div>
+                        <div class="small muted mt-s">@(hw.Kind == HomeworkKind.Practice ? $"{hw.QuestionCount} ta savol" : hw.Kind == HomeworkKind.Test ? "Test" : "Fayl / matn") · Muddat: @Tz.Fmt(hw.Deadline) · @hw.CreatedByUser.FullName</div>
+                        @if (!string.IsNullOrWhiteSpace(hw.Description)) { <p class="small mt-s" style="white-space:pre-line">@hw.Description</p> }
+                        @if (hw.FileId is int fid) { <a class="btn sm mt-s" href="/files/@fid" target="_blank"><Icon Name="download" /> Vazifa fayli</a> }
+                        @if (sub?.Score is not null) { <div class="mt-s">Ball: <b>@sub.Score / @sub.MaxScore</b></div> }
+                        @if (!string.IsNullOrWhiteSpace(sub?.TeacherComment)) { <div class="alert ok mt-s"><b>O'qituvchi izohi:</b> @sub.TeacherComment</div> }
+                    </div>
+                    <div class="row">
+                        @if (sub?.Status is SubmissionStatus.Submitted or SubmissionStatus.Reviewed)
+                        {
+                            @if (sub.PracticeSessionId is int ps) { <a class="btn sm" href="/practice/@ps/result">Natija</a> }
+                            @if (sub.AttemptId is int at) { <a class="btn sm" href="/attempt/@at/result">Natija</a> }
+                        }
+                        else if (overdue) { <span class="badge danger">Muddat o'tgan</span> }
+                        else if (hw.Kind == HomeworkKind.Practice) { <button class="btn primary" @onclick="() => StartAsync(hw.Id)">@(sub?.Status == SubmissionStatus.InProgress ? "Davom ettirish" : "Boshlash")</button> }
+                        else if (hw.Kind == HomeworkKind.Test) { <a class="btn primary" href="/tests">Testlar sahifasida ochish</a> }
+                        else { <button class="btn primary" @onclick="() => { uploadFor = hw.Id; text = sub?.TextAnswer ?? string.Empty; }">Topshirish</button> }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <Modal Open="uploadFor is not null" OpenChanged="v => { if (!v) uploadFor = null; }" Title="Vazifani topshirish">
+        <label class="lbl">Javob matni (ixtiyoriy)</label>
+        <textarea class="input" @bind="text" rows="5"></textarea>
+        <label class="lbl">Fayl (PDF, rasm, Word; 25 MB gacha)</label>
+        <div class="drop"><InputFile OnChange="OnFile" /> @(fileName ?? "Faylni tanlang yoki shu yerga tashlang")</div>
+        @if (Error is not null) { <div class="error">@Error</div> }
+        <div class="modal-actions"><button class="btn" @onclick="() => uploadFor = null">Bekor</button><button class="btn primary" @onclick="SubmitAsync" disabled="@busy">Topshirish</button></div>
+    </Modal>
+}
+
+@code {
+    private List<StudentHomework> list = [];
+    private int sid, uploadFor0;
+    private int? uploadFor;
+    private string text = "";
+    private string? fileName;
+    private IBrowserFile? file;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync() { SetTitle("Uy vazifasi"); sid = await Me.StudentIdAsync() ?? 0; list = await HomeworkSvc.ForStudentAsync(sid); Loading = false; }
+
+    private async Task StartAsync(int id)
+    {
+        var (sessionId, err) = await HomeworkSvc.StartPracticeAsync(id, sid);
+        if (err is not null && sessionId is null) { Toasts.Error(err); return; }
+        Nav.NavigateTo(sessionId is int s && err is null ? $"/practice/{s}" : $"/practice/{sessionId}/result");
+    }
+
+    private void OnFile(InputFileChangeEventArgs e) { file = e.File; fileName = e.File.Name; }
+
+    private async Task SubmitAsync()
+    {
+        if (uploadFor is null) return;
+        busy = true; Error = null;
+        int? fileId = null;
+        if (file is not null)
+        {
+            try
+            {
+                await using var stream = file.OpenReadStream(MediaService.MaxSize);
+                var (_, id, err) = await Media.UploadAsync(stream, file.Name, file.ContentType, file.Size, await Me.IdAsync(), imagesOnly: false);
+                if (err is not null) { Error = err; busy = false; return; }
+                fileId = id;
+            }
+            catch (Exception ex) { Error = "Fayl yuklanmadi: " + ex.Message; busy = false; return; }
+        }
+        var e2 = await HomeworkSvc.SubmitFileAsync(uploadFor.Value, sid, fileId, string.IsNullOrWhiteSpace(text) ? null : text);
+        busy = false;
+        if (e2 is not null) { Error = e2; return; }
+        uploadFor = null; file = null; fileName = null;
+        Toasts.Ok("Vazifa topshirildi");
+        list = await HomeworkSvc.ForStudentAsync(sid);
+    }
+}

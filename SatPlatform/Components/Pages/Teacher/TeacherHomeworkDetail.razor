@@ -1,0 +1,89 @@
+@page "/teacher/homework/{HomeworkId:int}"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+@inject HomeworkService HomeworkSvc
+
+<PageTitle>Uy vazifasi</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (hw is null) { <div class="empty"><h3>Topilmadi</h3></div> }
+else
+{
+    <div class="card mb">
+        <div class="row between">
+            <div><h1>@hw.Title</h1><div class="muted small">@(hw.Group?.Name ?? hw.Student?.User.FullName) · @(hw.Kind == HomeworkKind.Practice ? $"Mashq, {hw.QuestionCount} ta savol" : hw.Kind == HomeworkKind.Test ? "Test" : "Fayl / matn") · Muddat: @Tz.Fmt(hw.Deadline)</div>@if (!string.IsNullOrWhiteSpace(hw.Description)) { <p class="small mt-s">@hw.Description</p> }</div>
+            <div class="row">@if (hw.FileId is int f) { <a class="btn sm" href="/files/@f" target="_blank"><Icon Name="download" /> Fayl</a> }<button class="btn sm danger" @onclick="DeleteAsync"><Icon Name="trash" Size="14" /> O'chirish</button></div>
+        </div>
+    </div>
+    <div class="card pad-0"><div class="table-wrap"><table class="table">
+        <thead><tr><th>O'quvchi</th><th>Holat</th><th>Topshirilgan</th><th class="num">Ball</th><th>Izoh</th><th></th></tr></thead>
+        <tbody>@foreach (var s in subs)
+        {
+            <tr>
+                <td class="bold">@s.Student.User.FullName</td>
+                <td><span class="badge @(s.Status == SubmissionStatus.Reviewed ? "ok" : s.Status == SubmissionStatus.Submitted ? "accent" : hw.Deadline < DateTime.UtcNow ? "danger" : "")">@Labels.Submission(s.Status, hw.Deadline)</span></td>
+                <td>@Tz.Fmt(s.SubmittedAt)</td>
+                <td class="num">@(s.Score is int sc ? $"{sc}/{s.MaxScore}" : "—")</td>
+                <td class="small">@s.TeacherComment</td>
+                <td class="row">
+                    @if (s.PracticeSessionId is int ps) { <a class="btn sm" href="/practice/@ps/result">Javoblar</a> }
+                    @if (s.AttemptId is int at) { <a class="btn sm" href="/attempt/@at/review">Javoblar</a> }
+                    @if (s.FileId is int fid) { <a class="btn sm" href="/files/@fid" target="_blank">Fayl</a> }
+                    @if (!string.IsNullOrWhiteSpace(s.TextAnswer)) { <button class="btn sm" @onclick="() => viewText = s.TextAnswer">Matn</button> }
+                    @if (s.Status is SubmissionStatus.Submitted or SubmissionStatus.Reviewed) { <button class="btn sm primary" @onclick="() => Open(s)">@(s.Status == SubmissionStatus.Reviewed ? "Qayta baholash" : "Baholash")</button> }
+                </td>
+            </tr>
+        }</tbody></table></div></div>
+
+    <Modal Open="editing is not null" OpenChanged="v => { if (!v) editing = null; }" Title="Baholash">
+        @if (editing is not null)
+        {
+            <div class="bold mb-s">@editing.Student.User.FullName</div>
+            <div class="form-row"><div><label class="lbl">Ball</label><input class="input" type="number" min="0" @bind="score" /></div><div><label class="lbl">Maksimal</label><input class="input" type="number" min="1" @bind="maxScore" /></div></div>
+            <label class="lbl">Izoh</label><textarea class="input" @bind="comment" rows="3" placeholder="Yaxshi natija. Linear equations mavzusini takrorlang."></textarea>
+            <div class="modal-actions"><button class="btn" @onclick="() => editing = null">Bekor</button><button class="btn primary" @onclick="ReviewAsync">Saqlash</button></div>
+        }
+    </Modal>
+    <Modal Open="viewText is not null" OpenChanged="v => { if (!v) viewText = null; }" Title="O'quvchi javobi"><div style="white-space:pre-line">@viewText</div></Modal>
+}
+
+@code {
+    [Parameter] public int HomeworkId { get; set; }
+    private Homework? hw;
+    private List<HomeworkSubmission> subs = [];
+    private HomeworkSubmission? editing;
+    private int? score, maxScore;
+    private string? comment, viewText;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Uy vazifasi");
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        var d = await HomeworkSvc.DetailAsync(HomeworkId);
+        if (d is not null)
+        {
+            var (h, s) = d.Value;
+            var ok = role is UserRole.Admin or UserRole.SuperAdmin || h.CreatedByUserId == uid || (h.GroupId is int g && await Academy.CanSeeGroupAsync(uid, role, g)) || (h.StudentId is int st && await Academy.CanSeeStudentAsync(uid, role, st));
+            if (ok) { hw = h; subs = s; }
+        }
+        Loading = false;
+    }
+
+    private void Open(HomeworkSubmission s) { editing = s; score = s.Score; maxScore = s.MaxScore ?? (hw!.Kind == HomeworkKind.Practice ? hw.QuestionCount : 100); comment = s.TeacherComment; }
+
+    private async Task ReviewAsync()
+    {
+        var err = await HomeworkSvc.ReviewAsync(editing!.Id, score, maxScore, comment, await Me.IdAsync());
+        if (err is not null) { Toasts.Error(err); return; }
+        Toasts.Ok("Baholandi"); editing = null;
+        var d = await HomeworkSvc.DetailAsync(HomeworkId); if (d is not null) subs = d.Value.Submissions;
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (!await ConfirmAsync("Vazifani o'chirasizmi?")) return;
+        await HomeworkSvc.DeleteAsync(HomeworkId, await Me.IdAsync());
+        Nav.NavigateTo("/teacher/homework");
+    }
+}

@@ -1,0 +1,59 @@
+@page "/teacher"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+@inject AnalyticsService Analytics
+@inject HomeworkService HomeworkSvc
+
+<PageTitle>O'qituvchi paneli</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="grid c4 mb">
+        <div class="stat accent"><div class="label">Mening guruhlarim</div><div class="value">@groups.Count</div><div class="sub">@groups.Sum(g => g.Enrollments.Count) ta o'quvchi</div></div>
+        <div class="stat"><div class="label">Bugungi darslar</div><div class="value">@today.Count</div><div class="sub">@Tz.Today.ToString("dd.MM.yyyy")</div></div>
+        <div class="stat"><div class="label">E'tibor talab qiladi</div><div class="value level-weak">@attention.Count</div><div class="sub">ball yoki aniqlik past</div></div>
+        <div class="stat"><div class="label">Tekshirilmagan vazifalar</div><div class="value">@pendingReviews</div><div class="sub">topshirilgan, baholanmagan</div></div>
+    </div>
+
+    <div class="grid c2 mb">
+        <div class="card">
+            <div class="card-title"><h2>Bugungi darslar</h2><a class="btn sm primary" href="/teacher/attendance"><Icon Name="calendar" /> Davomat olish</a></div>
+            @if (today.Count == 0) { <p class="muted small">Bugun jadval bo'yicha dars yo'q.</p> }
+            else { <div class="list">@foreach (var g in today) { <div class="list-item"><div class="grow"><div class="title">@g.Name</div><div class="sub">@g.StartTime?.ToString("HH:mm")–@g.EndTime?.ToString("HH:mm") · xona @(g.Room ?? "—") · @g.Enrollments.Count o'quvchi</div></div><a class="btn sm" href="/teacher/attendance?group=@g.Id">Davomat</a></div> }</div> }
+        </div>
+        <div class="card">
+            <div class="card-title"><h2>E'tibor talab qiladigan o'quvchilar</h2></div>
+            @if (attention.Count == 0) { <p class="muted small">Hammasi yaxshi 👍</p> }
+            else { <div class="list">@foreach (var s in attention) { <div class="list-item"><div class="grow"><div class="title">@s.Name</div><div class="sub">Ball @(s.Score?.ToString() ?? "—") · aniqlik @(s.Accuracy?.ToString() ?? "—")% · @(s.WeakestSkill is null ? "" : $"{s.WeakestSkill} {s.WeakestAccuracy}%") · davomat @(s.Attendance?.ToString() ?? "—")%</div></div><a class="btn sm" href="/teacher/students/@s.StudentId">Ochish</a></div> }</div> }
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><h2>So'nggi natijalar</h2><a class="small" href="/teacher/students">Barcha o'quvchilar →</a></div>
+        @if (recent.Count == 0) { <p class="muted small">Hali natijalar yo'q.</p> }
+        else { <div class="table-wrap"><table class="table"><thead><tr><th>O'quvchi</th><th>Guruh</th><th class="num">Ball</th><th class="num">Aniqlik</th><th>Oxirgi faollik</th><th></th></tr></thead><tbody>@foreach (var s in recent) { <tr><td class="bold">@s.Name</td><td>@s.Groups</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Accuracy?.ToString() ?? "—")%</td><td>@Tz.Fmt(s.LastActive)</td><td><a class="btn sm" href="/teacher/students/@s.StudentId">Ochish</a></td></tr> }</tbody></table></div> }
+    </div>
+}
+
+@code {
+    private List<Group> groups = [];
+    private List<Group> today = [];
+    private List<AnalyticsService.StudentSummary> attention = [], recent = [];
+    private int pendingReviews;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("O'qituvchi paneli");
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        var scope = await Academy.GroupScopeAsync(uid, role);
+        groups = await Academy.GroupsAsync(scope);
+        today = groups.Where(g => AcademyService.HasClassOn(g, Tz.Today)).OrderBy(g => g.StartTime).ToList();
+        var students = await Analytics.StudentSummariesAsync(await Academy.StudentScopeAsync(uid, role));
+        attention = students.Where(s => (s.Accuracy is < 55) || (s.Attendance is < 75) || (s.WeakestAccuracy is < 40)).OrderBy(s => s.Accuracy ?? 100).Take(6).ToList();
+        recent = students.Where(s => s.LastActive is not null).OrderByDescending(s => s.LastActive).Take(8).ToList();
+        pendingReviews = (await HomeworkSvc.ForStaffAsync(uid, role, scope)).Sum(h => h.Submitted - h.Reviewed);
+        Loading = false;
+    }
+}

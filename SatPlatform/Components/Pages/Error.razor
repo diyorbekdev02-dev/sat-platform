@@ -1,0 +1,21 @@
+@page "/Error"
+@layout EmptyLayout
+@using System.Diagnostics
+
+<PageTitle>Xatolik</PageTitle>
+<div class="auth-screen">
+    <div class="empty">
+        <div class="big">⚠️</div>
+        <h3>Xatolik yuz berdi</h3>
+        <p class="muted">So'rovingizni bajarishda xatolik bo'ldi. Qaytadan urinib ko'ring.</p>
+        @if (ShowRequestId) { <p class="tiny muted">Request ID: <code>@RequestId</code></p> }
+        <a class="btn mt" href="/">Bosh sahifaga</a>
+    </div>
+</div>
+
+@code {
+    [CascadingParameter] private HttpContext? HttpContext { get; set; }
+    private string? RequestId { get; set; }
+    private bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+    protected override void OnInitialized() => RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+}

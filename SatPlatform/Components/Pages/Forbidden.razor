@@ -1,0 +1,11 @@
+@page "/forbidden"
+@inherits AppPage
+
+<div class="empty">
+    <div class="big">🔒</div>
+    <h3>Bu sahifaga ruxsatingiz yo'q</h3>
+    <p class="muted">Boshqa rol bilan kiring yoki administratorga murojaat qiling.</p>
+    <a class="btn mt" href="/">Bosh sahifaga</a>
+</div>
+
+@code { protected override void OnInitialized() => SetTitle("Ruxsat yo'q"); }

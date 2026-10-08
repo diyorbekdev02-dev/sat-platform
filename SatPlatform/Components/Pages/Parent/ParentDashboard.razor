@@ -1,0 +1,41 @@
+@page "/parent"
+@page "/parent/tests"
+@page "/parent/attendance"
+@attribute [Authorize(Roles = "Parent")]
+@inherits AppPage
+@inject AcademyService Academy
+
+<PageTitle>Farzandim</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (children.Count == 0)
+{
+    <div class="card"><div class="empty"><div class="big">👨‍👩‍👧</div><h3>Farzand bog'lanmagan</h3><p class="small">Farzandingizning profilidagi <b>ota-ona kodini</b> Profil sahifasida kiriting.</p><a class="btn primary mt" href="/profile">Profilga o'tish</a></div></div>
+}
+else
+{
+    @if (children.Count > 1)
+    {
+        <div class="chips mb">@foreach (var c in children) { <button class="chip @(current?.Id == c.Id ? "active" : "")" @onclick="() => current = c">@c.User.FullName</button> }</div>
+    }
+    @if (current is not null)
+    {
+        <div class="card mb">
+            <div class="row"><div class="avatar lg" style="background:@current.User.AvatarColor">@current.User.FullName[0]</div><div><h1>@current.User.FullName</h1><div class="muted small">@string.Join(", ", current.Enrollments.Select(e => $"{e.Group.Name} · {e.Group.TeacherUser?.FullName ?? "—"} · {Labels.Days(e.Group.ScheduleDays)} {e.Group.StartTime:HH\\:mm}"))</div></div></div>
+        </div>
+        <StudentProgressPanel @key="current.Id" StudentId="current.Id" InitialTab="@InitialTab" />
+    }
+}
+
+@code {
+    private List<Data.Student> children = [];
+    private Data.Student? current;
+    private string InitialTab => Nav.Uri.EndsWith("/tests") ? "tests" : Nav.Uri.EndsWith("/attendance") ? "attendance" : "overview";
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Farzandim");
+        children = await Academy.ChildrenOfAsync(await Me.IdAsync());
+        current = children.FirstOrDefault();
+        Loading = false;
+    }
+}

@@ -1,0 +1,41 @@
+@page "/attempt/{AttemptId:int}/review"
+@attribute [Authorize]
+@inherits AppPage
+@inject TestEngineService Engine
+@inject AcademyService Academy
+
+<PageTitle>Javoblarni ko'rish</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (a is null) { <div class="empty"><h3>Topilmadi</h3></div> }
+else
+{
+    <div class="row between mb">
+        <div><b>@a.Test.Title</b> <span class="muted small">· @Tz.Fmt(a.CompletedAt)@(staffView ? $" · {a.Student.User.FullName}" : "")</span></div>
+        <a class="btn sm" href="/attempt/@AttemptId/result">← Natija</a>
+    </div>
+    <AttemptReviewList Questions="questions" PracticeLink="!staffView" />
+}
+
+@code {
+    [Parameter] public int AttemptId { get; set; }
+    private TestAttempt? a;
+    private List<AttemptQuestion> questions = [];
+    private bool staffView;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Javoblarni ko'rish");
+        var sid = await Me.StudentIdAsync();
+        var role = await Me.RoleAsync();
+        var staff = role is UserRole.Admin or UserRole.SuperAdmin or UserRole.Teacher or UserRole.Assistant or UserRole.Parent;
+        a = await Engine.ResultAsync(AttemptId, sid, staff);
+        if (a is not null && staff)
+        {
+            staffView = true;
+            if (!await Academy.CanSeeStudentAsync(await Me.IdAsync(), role!.Value, a.StudentId)) a = null;
+        }
+        if (a is not null) questions = await Engine.ReviewAsync(AttemptId, sid, staff);
+        Loading = false;
+    }
+}

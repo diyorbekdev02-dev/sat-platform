@@ -1,0 +1,134 @@
+@* Renders one question (from a frozen QuestionVersion) in test / practice / review mode. *@
+@inject IJSRuntime JS
+
+<div class="q-view" id="@containerId">
+    @if (ShowPassageInline && !string.IsNullOrWhiteSpace(Version.Passage))
+    {
+        <div class="q-content passage-inline mb">@((MarkupString)Version.Passage)</div>
+    }
+    <div class="q-content">@((MarkupString)Version.Text)</div>
+
+    @if (Version.Type == QuestionType.MultipleChoice)
+    {
+        <div class="options">
+            @foreach (var o in options)
+            {
+                var selected = string.Equals(Answer, o.Key, StringComparison.OrdinalIgnoreCase);
+                var eliminated = Eliminated.Contains(o.Key);
+                var cls = "option";
+                if (Mode == QuestionMode.Review || Revealed)
+                {
+                    if (o.IsCorrect) cls += " correct"; else if (selected) cls += " wrong";
+                    cls += " locked";
+                }
+                else if (selected) cls += " selected";
+                if (eliminated && !(Mode == QuestionMode.Review || Revealed)) cls += " eliminated";
+                <div class="@cls" @onclick="() => Select(o.Key)">
+                    <span class="opt-key">@o.Key</span>
+                    <div class="opt-text">@((MarkupString)o.Text)</div>
+                    @if (Mode == QuestionMode.Test && !Revealed)
+                    {
+                        <button type="button" class="elim-btn @(eliminated ? "on" : "")" title="Variantni chizib tashlash" @onclick="() => ToggleEliminate(o.Key)" @onclick:stopPropagation="true">@o.Key</button>
+                    }
+                </div>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="spr">
+            <label class="lbl">Javobingizni kiriting</label>
+            @if (Mode == QuestionMode.Review || Revealed)
+            {
+                <div class="row">
+                    <span class="badge @(IsCorrect == true ? "ok" : "danger")">Sizning javobingiz: @(string.IsNullOrEmpty(Answer) ? "—" : Answer)</span>
+                    <span class="badge ok">To'g'ri javob: @FirstCorrect</span>
+                </div>
+            }
+            else
+            {
+                <input class="input" inputmode="decimal" maxlength="7" placeholder="masalan 3/4 yoki -2.5" value="@Answer" @oninput="OnSprInput" @onblur="OnSprBlur" @onkeydown="@(e => { if (e.Key == "Enter") _ = OnSprBlur(); })" />
+                @if (sprError is not null) { <div class="error">@sprError</div> }
+                else { <div class="spr-preview">Butun son, manfiy son, o'nlik kasr (0.75) yoki oddiy kasr (3/4). Ko'pi bilan 5 ta belgi (manfiy bo'lsa 6).</div> }
+            }
+        </div>
+    }
+
+    @if (Mode == QuestionMode.Practice && Revealed)
+    {
+        <div class="feedback @(IsCorrect == true ? "ok" : "bad")">
+            <Icon Name="@(IsCorrect == true ? "check" : "x")" />
+            @(IsCorrect == true ? "To'g'ri!" : Version.Type == QuestionType.SPR ? $"Noto'g'ri. To'g'ri javob: {FirstCorrect}" : $"Noto'g'ri. To'g'ri javob: {options.FirstOrDefault(o => o.IsCorrect)?.Key}")
+        </div>
+    }
+    @if ((Mode == QuestionMode.Review || Revealed) && ShowExplanation && !string.IsNullOrWhiteSpace(Version.Explanation))
+    {
+        <div class="explanation">
+            <h4>Izoh</h4>
+            <div class="q-content">@((MarkupString)Version.Explanation)</div>
+            @if (!string.IsNullOrWhiteSpace(Version.VideoUrl)) { <a class="btn sm mt-s" href="@Version.VideoUrl" target="_blank"><Icon Name="play" /> Video izohni ko'rish</a> }
+        </div>
+    }
+</div>
+
+@code {
+    public enum QuestionMode { Test, Practice, Review }
+
+    [Parameter, EditorRequired] public QuestionVersion Version { get; set; } = null!;
+    [Parameter] public QuestionMode Mode { get; set; } = QuestionMode.Test;
+    [Parameter] public string? Answer { get; set; }
+    [Parameter] public bool? IsCorrect { get; set; }
+    [Parameter] public bool Revealed { get; set; }
+    [Parameter] public bool ShowExplanation { get; set; } = true;
+    [Parameter] public bool ShowPassageInline { get; set; } = true;
+    [Parameter] public string EliminatedText { get; set; } = "";
+    [Parameter] public EventCallback<string?> OnAnswer { get; set; }
+    [Parameter] public EventCallback<string> OnEliminate { get; set; }
+
+    private readonly string containerId = "q" + Guid.NewGuid().ToString("N")[..8];
+    private List<OptionSnapshot> options = [];
+    private string? sprError;
+    private string? pendingSpr;
+    private int lastVersionId;
+    private HashSet<string> Eliminated => new((EliminatedText ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries));
+    private string FirstCorrect => (Version.CorrectAnswer ?? "").Split('|').FirstOrDefault() ?? "";
+
+    protected override void OnParametersSet()
+    {
+        options = ScoringService.Options(Version);
+        if (lastVersionId != Version.Id) { lastVersionId = Version.Id; pendingSpr = null; sprError = null; }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        try { await JS.InvokeVoidAsync("sat.renderMath", containerId); } catch { }
+    }
+
+    private async Task Select(string key)
+    {
+        if (Mode == QuestionMode.Review || Revealed) return;
+        var next = string.Equals(Answer, key, StringComparison.OrdinalIgnoreCase) && Mode == QuestionMode.Test ? null : key;
+        await OnAnswer.InvokeAsync(next);
+    }
+
+    private async Task ToggleEliminate(string key)
+    {
+        var set = Eliminated;
+        if (!set.Remove(key)) set.Add(key);
+        await OnEliminate.InvokeAsync(string.Join(",", set.OrderBy(k => k)));
+    }
+
+    private void OnSprInput(ChangeEventArgs e)
+    {
+        pendingSpr = e.Value?.ToString();
+        sprError = ScoringService.ValidateSprInput(pendingSpr);
+    }
+
+    private async Task OnSprBlur()
+    {
+        if (pendingSpr is null) return;
+        if (ScoringService.ValidateSprInput(pendingSpr) is string err) { sprError = err; return; }
+        var v = pendingSpr; pendingSpr = null;
+        if (v != Answer) await OnAnswer.InvokeAsync(string.IsNullOrWhiteSpace(v) ? null : v.Trim());
+    }
+}

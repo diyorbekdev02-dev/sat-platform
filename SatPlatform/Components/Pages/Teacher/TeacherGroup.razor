@@ -1,0 +1,111 @@
+@page "/teacher/groups/{GroupId:int}"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+@inject AnalyticsService Analytics
+@inject TestBuilderService Builder
+@inject HomeworkService HomeworkSvc
+
+<PageTitle>Guruh</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (group is null) { <div class="empty"><h3>Guruh topilmadi yoki sizga biriktirilmagan</h3></div> }
+else
+{
+    <div class="card mb">
+        <div class="row between">
+            <div><h1>@group.Name</h1><div class="muted small">@(group.TeacherUser?.FullName ?? "—")@(group.AssistantUser is null ? "" : $" · assistent {group.AssistantUser.FullName}") · @Labels.Days(group.ScheduleDays) @group.StartTime?.ToString("HH:mm")–@group.EndTime?.ToString("HH:mm") · xona @(group.Room ?? "—")</div></div>
+            <div class="row"><a class="btn" href="/teacher/attendance?group=@GroupId"><Icon Name="calendar" /> Davomat</a><a class="btn" href="/teacher/assign?group=@GroupId"><Icon Name="send" /> Test tayinlash</a><a class="btn" href="/teacher/homework/new?group=@GroupId"><Icon Name="clipboard" /> Uy vazifasi</a>@if (isAdmin) { <a class="btn" href="/admin/groups/@GroupId"><Icon Name="pencil" /> Tahrirlash</a> }</div>
+        </div>
+    </div>
+    <div class="tabs">
+        @foreach (var t in new[] { ("students", "O'quvchilar"), ("progress", "Progress"), ("attendance", "Davomat"), ("tests", "Testlar"), ("homework", "Uy vazifalari") }) { <button class="tab @(tab == t.Item1 ? "active" : "")" @onclick="() => tab = t.Item1">@t.Item2</button> }
+    </div>
+
+    @if (tab == "students")
+    {
+        <div class="card pad-0"><div class="table-wrap"><table class="table">
+            <thead><tr><th>Ism</th><th>Telefon</th><th class="num">Ball</th><th class="num">Maqsad</th><th class="num">Aniqlik</th><th class="num">Davomat</th><th>Eng zaif skill</th><th>Oxirgi faollik</th><th></th></tr></thead>
+            <tbody>@foreach (var s in students)
+            {
+                <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/students/{s.StudentId}"))">
+                    <td class="bold">@s.Name</td><td>@s.Phone</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Target?.ToString() ?? "—")</td>
+                    <td class="num @(s.Accuracy is < 50 ? "level-weak" : "")">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num @(s.Attendance is < 80 ? "level-weak" : "")">@(s.Attendance?.ToString() ?? "—")%</td>
+                    <td>@(s.WeakestSkill is null ? "—" : $"{s.WeakestSkill} ({s.WeakestAccuracy}%)")</td><td>@Tz.Fmt(s.LastActive)</td><td><a class="btn sm" href="/teacher/students/@s.StudentId">Ochish</a></td>
+                </tr>
+            }</tbody></table></div></div>
+    }
+    else if (tab == "progress")
+    {
+        <div class="grid c2">
+            <div class="card"><div class="card-title"><h2>Guruhning zaif skilllari</h2></div>
+                @if (skills.Count == 0) { <p class="muted small">Ma'lumot yo'q.</p> }
+                else { @foreach (var s in skills.Take(12)) { <div class="skill-row"><span class="name">@s.Skill <span class="tiny muted">(@s.Students o'quvchi)</span></span><div class="progress @(s.Accuracy < 50 ? "weak" : s.Accuracy > 75 ? "strong" : "medium")"><span style="width:@(s.Accuracy)%"></span></div><span class="pct">@s.Accuracy.ToString("0")%</span></div> } }
+            </div>
+            <div class="card"><div class="card-title"><h2>Ball bo'yicha reyting</h2></div>
+                <div class="list">@foreach (var s in students.OrderByDescending(x => x.Score ?? 0)) { <div class="list-item"><div class="grow"><div class="title">@s.Name</div><div class="sub">@s.Tests test · @s.Practices mashq</div></div><b>@(s.Score?.ToString() ?? "—")</b></div> }</div>
+            </div>
+        </div>
+    }
+    else if (tab == "attendance")
+    {
+        <div class="card">
+            <div class="card-title"><h2>Oxirgi 30 kun</h2><a class="btn sm primary" href="/teacher/attendance?group=@GroupId">Davomat olish</a></div>
+            @if (dates.Count == 0) { <p class="muted small">Davomat yozuvlari yo'q.</p> }
+            else
+            {
+                <div class="table-wrap"><table class="table"><thead><tr><th>O'quvchi</th>@foreach (var d in dates) { <th>@d.ToString("dd.MM")</th> }<th class="num">%</th></tr></thead>
+                    <tbody>@foreach (var s in students)
+                    {
+                        var mine = history.Where(a => a.StudentId == s.StudentId).ToList();
+                        var rate = mine.Count == 0 ? (double?)null : Math.Round(mine.Count(a => a.Status is AttendanceStatus.Present or AttendanceStatus.Late) * 100.0 / mine.Count);
+                        <tr><td class="bold">@s.Name</td>@foreach (var d in dates) { var a = mine.FirstOrDefault(x => x.Date == d); <td>@if (a is not null) { <span class="badge @(a.Status == AttendanceStatus.Present ? "ok" : a.Status == AttendanceStatus.Absent ? "danger" : a.Status == AttendanceStatus.Late ? "warn" : "accent")" title="@Labels.Attendance(a.Status)">@(a.Status == AttendanceStatus.Present ? "✓" : a.Status == AttendanceStatus.Absent ? "✗" : a.Status == AttendanceStatus.Late ? $"{a.LateMinutes}'" : "S")</span> }</td> }<td class="num">@(rate?.ToString() ?? "—")</td></tr>
+                    }</tbody></table></div>
+            }
+        </div>
+    }
+    else if (tab == "tests")
+    {
+        <div class="card pad-0">
+            @if (assignments.Count == 0) { <div class="empty"><h3>Tayinlangan testlar yo'q</h3><a class="btn primary mt" href="/teacher/assign?group=@GroupId">Test tayinlash</a></div> }
+            else { <div class="table-wrap"><table class="table"><thead><tr><th>Test</th><th>Boshlanish</th><th>Muddat</th><th>Urinishlar</th><th></th></tr></thead><tbody>@foreach (var a in assignments) { <tr><td class="bold">@a.Test.Title</td><td>@Tz.Fmt(a.StartAt)</td><td>@Tz.Fmt(a.EndAt)</td><td>@(a.AttemptLimit?.ToString() ?? "cheksiz")</td><td><a class="btn sm" href="/teacher/assign?test=@a.TestId&group=@GroupId">Natijalar</a></td></tr> }</tbody></table></div> }
+        </div>
+    }
+    else if (tab == "homework")
+    {
+        <div class="card pad-0">
+            @if (homework.Count == 0) { <div class="empty"><h3>Uy vazifalari yo'q</h3><a class="btn primary mt" href="/teacher/homework/new?group=@GroupId">Vazifa berish</a></div> }
+            else { <div class="table-wrap"><table class="table"><thead><tr><th>Vazifa</th><th>Muddat</th><th class="num">Topshirdi</th><th class="num">Tekshirildi</th><th></th></tr></thead><tbody>@foreach (var h in homework) { <tr><td class="bold">@h.Homework.Title</td><td>@Tz.Fmt(h.Homework.Deadline)</td><td class="num">@h.Submitted / @h.Total</td><td class="num">@h.Reviewed</td><td><a class="btn sm" href="/teacher/homework/@h.Homework.Id">Ochish</a></td></tr> }</tbody></table></div> }
+        </div>
+    }
+}
+
+@code {
+    [Parameter] public int GroupId { get; set; }
+    private Group? group;
+    private string tab = "students";
+    private bool isAdmin;
+    private List<AnalyticsService.StudentSummary> students = [];
+    private List<AnalyticsService.SkillAggregate> skills = [];
+    private List<Attendance> history = [];
+    private List<DateOnly> dates = [];
+    private List<TestAssignment> assignments = [];
+    private List<HomeworkRow> homework = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Guruh");
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        isAdmin = role is UserRole.Admin or UserRole.SuperAdmin;
+        if (!await Academy.CanSeeGroupAsync(uid, role, GroupId)) { Loading = false; return; }
+        group = await Academy.GroupAsync(GroupId);
+        if (group is null) { Loading = false; return; }
+        students = await Analytics.StudentSummariesAsync(groupId: GroupId);
+        skills = await Analytics.GroupSkillsAsync(students.Select(s => s.StudentId));
+        history = await Academy.GroupAttendanceHistoryAsync(GroupId);
+        dates = history.Select(a => a.Date).Distinct().OrderBy(d => d).ToList();
+        assignments = await Builder.AssignmentsAsync(groupId: GroupId);
+        homework = (await HomeworkSvc.ForStaffAsync(uid, role, [GroupId])).Where(h => h.Homework.GroupId == GroupId).ToList();
+        Loading = false;
+    }
+}

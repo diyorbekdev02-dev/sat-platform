@@ -1,0 +1,135 @@
+@page "/practice/{SessionId:int}"
+@attribute [Authorize(Roles = "Student")]
+@layout EmptyLayout
+@inherits AppPage
+@inject PracticeService PracticeSvc
+@implements IAsyncDisposable
+
+<PageTitle>Mashq</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else if (s is null) { <div class="center-box"><div class="card"><div class="empty"><h3>Mashq topilmadi</h3><a class="btn mt" href="/practice">Mashqlarga qaytish</a></div></div></div> }
+else if (s.Status != PracticeStatus.InProgress) { <div class="center-box"><div class="card"><div class="empty"><div class="big">✅</div><h3>Mashq yakunlangan</h3><a class="btn primary mt" href="/practice/@SessionId/result">Natijani ko'rish</a></div></div></div> }
+else
+{
+    var q = Current;
+    <div class="test-shell">
+        <header class="test-header">
+            <div><div class="title">@s.Title</div><div class="sub">@Labels.PracticeMode(s.Mode) · @s.QuestionCount ta savol</div></div>
+            <div class="spacer"></div>
+            @if (s.DeadlineAt is not null) { <div class="timer" id="timer">@Labels.Time(Math.Max(0, (int)(s.DeadlineAt.Value - DateTime.UtcNow).TotalSeconds))</div> }
+            <span class="badge ok">@s.CorrectCount to'g'ri</span><span class="badge danger">@(s.AnsweredCount - s.CorrectCount) xato</span>
+            <button class="btn sm" @onclick="FinishAsync"><Icon Name="check" /> Yakunlash</button>
+        </header>
+        @if (q is not null)
+        {
+            var hasPassage = !string.IsNullOrWhiteSpace(q.QuestionVersion.Passage);
+            <div class="test-body @(hasPassage ? "" : "single")">
+                @if (hasPassage) { <div class="panel passage" id="passage-panel"><div class="q-content" id="passage-content">@((MarkupString)q.QuestionVersion.Passage!)</div></div> }
+                <div class="panel question" id="question-panel">
+                    <div class="row between mb-s">
+                        <div class="row"><div class="q-number"><span class="n">@(index + 1)</span><span class="small muted">/ @s.Questions.Count</span></div><span class="badge">@q.Question.Skill.Name</span><span class="badge">@Labels.Difficulty(q.Question.Difficulty)</span></div>
+                        <button class="flag-btn @(q.IsFlagged ? "on" : "")" @onclick="ToggleFlag"><Icon Name="flag" Size="15" /> Belgilash</button>
+                    </div>
+                    <QuestionView @key="q.Id" Version="q.QuestionVersion" Mode="QuestionView.QuestionMode.Practice" Answer="@q.Answer" IsCorrect="q.IsCorrect" Revealed="q.AnsweredAt is not null" EliminatedText="@(q.EliminatedOptions ?? "")" ShowPassageInline="false" OnAnswer="PickAsync" OnEliminate="EliminateAsync" />
+                    @if (q.AnsweredAt is null && q.QuestionVersion.Type == QuestionType.MultipleChoice && pendingAnswer is not null)
+                    {
+                        <button class="btn primary mt" @onclick="SubmitAsync" disabled="@busy">Javobni tasdiqlash</button>
+                    }
+                    @if (q.AnsweredAt is null && q.QuestionVersion.Type == QuestionType.SPR)
+                    {
+                        <button class="btn primary mt" @onclick="SubmitAsync" disabled="@(busy || pendingAnswer is null)">Javobni tasdiqlash</button>
+                    }
+                    @if (Error is not null) { <div class="alert danger mt">@Error</div> }
+                </div>
+            </div>
+        }
+        <footer class="test-footer">
+            <button class="btn" @onclick="() => Go(index - 1)" disabled="@(index == 0)"><Icon Name="arrow-left" /> Oldingi</button>
+            <div class="spacer"></div>
+            <div class="qgrid">
+                @for (var i = 0; i < s.Questions.Count; i++)
+                {
+                    var qq = s.Questions[i]; var ii = i;
+                    <button class="qcell @(qq.AnsweredAt is not null ? (qq.IsCorrect == true ? "correct" : "wrong") : "") @(qq.IsFlagged ? "flagged" : "") @(ii == index ? "current" : "")" @onclick="() => Go(ii)">@(i + 1)</button>
+                }
+            </div>
+            <div class="spacer"></div>
+            @if (index < s.Questions.Count - 1) { <button class="btn primary" @onclick="() => Go(index + 1)">Keyingi <Icon Name="arrow-right" /></button> }
+            else { <button class="btn primary" @onclick="FinishAsync" disabled="@busy">Yakunlash <Icon Name="check" /></button> }
+        </footer>
+    </div>
+}
+
+@code {
+    [Parameter] public int SessionId { get; set; }
+    private Data.PracticeSession? s;
+    private int index, studentId;
+    private bool busy;
+    private string? pendingAnswer;
+    private DateTime shownAt = DateTime.UtcNow;
+    private DotNetObjectReference<PracticeRun>? self;
+    private bool timerStarted;
+    private PracticeQuestion? Current => s is null || s.Questions.Count == 0 ? null : s.Questions[Math.Clamp(index, 0, s.Questions.Count - 1)];
+
+    protected override async Task OnInitializedAsync()
+    {
+        studentId = await Me.StudentIdAsync() ?? 0;
+        s = await PracticeSvc.GetAsync(SessionId, studentId);
+        if (s is not null) { var first = s.Questions.FindIndex(q => q.AnsweredAt is null); index = first < 0 ? 0 : first; }
+        Loading = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (first) self = DotNetObjectReference.Create(this);
+        if (s?.DeadlineAt is DateTime d && !timerStarted && s.Status == PracticeStatus.InProgress)
+        {
+            timerStarted = true;
+            await JS.InvokeVoidAsync("sat.startTimer", "timer", Math.Max(0, (int)(d - DateTime.UtcNow).TotalSeconds), self);
+        }
+        try { await JS.InvokeVoidAsync("sat.renderMath", "passage-content"); } catch { }
+    }
+
+    [JSInvokable]
+    public async Task OnTimerExpired() { await Task.Delay(1000); s = await PracticeSvc.GetAsync(SessionId, studentId); await InvokeAsync(StateHasChanged); }
+
+    private void Go(int i) { index = Math.Clamp(i, 0, (s?.Questions.Count ?? 1) - 1); pendingAnswer = null; Error = null; shownAt = DateTime.UtcNow; }
+
+    private Task PickAsync(string? answer)
+    {
+        var q = Current;
+        if (q is null || q.AnsweredAt is not null) return Task.CompletedTask;
+        pendingAnswer = answer;
+        q.Answer = answer; // show the selection immediately
+        return Task.CompletedTask;
+    }
+
+    private async Task SubmitAsync()
+    {
+        var q = Current; if (q is null || s is null || pendingAnswer is null) return;
+        busy = true; Error = null;
+        var seconds = (int)(DateTime.UtcNow - shownAt).TotalSeconds;
+        var (correct, err) = await PracticeSvc.AnswerAsync(SessionId, studentId, q.Id, pendingAnswer, seconds);
+        busy = false;
+        if (err is not null) { Error = err; if (err == "Vaqt tugadi.") s = await PracticeSvc.GetAsync(SessionId, studentId); return; }
+        q.IsCorrect = correct; q.AnsweredAt = DateTime.UtcNow; q.TimeSpentSeconds += seconds;
+        s.AnsweredCount++; if (correct == true) s.CorrectCount++;
+        pendingAnswer = null;
+    }
+
+    private async Task EliminateAsync(string e) { var q = Current; if (q is null) return; q.EliminatedOptions = e; await PracticeSvc.EliminateAsync(SessionId, studentId, q.Id, e); }
+    private async Task ToggleFlag() { var q = Current; if (q is null) return; q.IsFlagged = !q.IsFlagged; await PracticeSvc.FlagAsync(SessionId, studentId, q.Id, q.IsFlagged); }
+
+    private async Task FinishAsync()
+    {
+        if (s is null) return;
+        var unanswered = s.Questions.Count(q => q.AnsweredAt is null);
+        if (unanswered > 0 && !await ConfirmAsync($"{unanswered} ta savol javobsiz. Mashqni yakunlaysizmi?")) return;
+        busy = true;
+        await PracticeSvc.FinishAsync(SessionId, studentId);
+        Nav.NavigateTo($"/practice/{SessionId}/result");
+    }
+
+    public async ValueTask DisposeAsync() { try { await JS.InvokeVoidAsync("sat.stopTimer", "timer"); } catch { } self?.Dispose(); }
+}

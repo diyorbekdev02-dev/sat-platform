@@ -1,0 +1,75 @@
+@page "/admin/materials"
+@attribute [Authorize(Roles = "Admin,SuperAdmin,Teacher,Assistant")]
+@inherits AppPage
+@inject MaterialService MaterialsSvc
+@inject MediaService Media
+@inject AcademyService Academy
+
+<PageTitle>Materiallar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="row between mb"><span class="muted small">@list.Count ta material</span><button class="btn primary" @onclick="() => Open(null)"><Icon Name="plus" /> Material qo'shish</button></div>
+    <div class="card pad-0">
+        @if (list.Count == 0) { <div class="empty"><h3>Materiallar yo'q</h3></div> }
+        else { <div class="table-wrap"><table class="table"><thead><tr><th>Nomi</th><th>Kategoriya</th><th>Fayl / havola</th><th>Guruh</th><th>Sana</th><th></th></tr></thead><tbody>@foreach (var m in list) { <tr><td class="bold">@m.Title<div class="tiny muted">@m.Description</div></td><td><span class="badge">@Labels.Material(m.Category)</span></td><td>@if (m.File is not null) { <a href="/files/@m.File.Id" target="_blank">@m.File.OriginalName</a> } @if (m.ExternalUrl is not null) { <a href="@m.ExternalUrl" target="_blank">havola</a> }</td><td>@(groups.FirstOrDefault(g => g.Id == m.GroupId)?.Name ?? "Hammaga")</td><td>@Tz.FmtDate(m.CreatedAt)</td><td class="row"><button class="btn sm" @onclick="() => Open(m)"><Icon Name="pencil" Size="14" /></button><button class="btn sm danger" @onclick="() => DeleteAsync(m.Id)"><Icon Name="trash" Size="14" /></button></td></tr> }</tbody></table></div> }
+    </div>
+
+    <Modal Open="editing is not null" OpenChanged="v => { if (!v) editing = null; }" Title="@(editing?.Id > 0 ? "Materialni tahrirlash" : "Yangi material")">
+        @if (editing is not null)
+        {
+            <label class="lbl">Nomi</label><input class="input" @bind="editing.Title" />
+            <label class="lbl">Tavsif</label><textarea class="input" @bind="editing.Description" rows="2"></textarea>
+            <div class="form-row">
+                <div><label class="lbl">Kategoriya</label><select class="input" @bind="editing.Category">@foreach (var c in Enum.GetValues<MaterialCategory>()) { <option value="@c">@Labels.Material(c)</option> }</select></div>
+                <div><label class="lbl">Guruh (ixtiyoriy)</label><select class="input" @bind="editing.GroupId"><option value="">Hammaga</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select></div>
+            </div>
+            <label class="lbl">Fayl (PDF, Word, rasm, video; 25 MB)</label>
+            <div class="drop"><InputFile OnChange="e => file = e.File" /> @(file?.Name ?? (editing.FileId is null ? "Faylni tanlang" : "Fayl yuklangan — almashtirish uchun tanlang"))</div>
+            <label class="lbl">yoki havola</label><input class="input" @bind="editing.ExternalUrl" placeholder="https://..." />
+            @if (Error is not null) { <div class="error">@Error</div> }
+            <div class="modal-actions"><button class="btn" @onclick="() => editing = null">Bekor</button><button class="btn primary" @onclick="SaveAsync" disabled="@busy">Saqlash</button></div>
+        }
+    </Modal>
+}
+
+@code {
+    private List<Material> list = [];
+    private List<Group> groups = [];
+    private Material? editing;
+    private IBrowserFile? file;
+    private bool busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Materiallar");
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        groups = await Academy.GroupsAsync(await Academy.GroupScopeAsync(uid, role));
+        await LoadAsync(); Loading = false;
+    }
+    private async Task LoadAsync() => list = await MaterialsSvc.ListAsync();
+    private void Open(Material? m) { editing = m is null ? new Material() : new Material { Id = m.Id, Title = m.Title, Description = m.Description, Category = m.Category, FileId = m.FileId, ExternalUrl = m.ExternalUrl, GroupId = m.GroupId }; file = null; Error = null; }
+
+    private async Task SaveAsync()
+    {
+        busy = true; Error = null;
+        if (file is not null)
+        {
+            try
+            {
+                await using var s = file.OpenReadStream(MediaService.MaxSize);
+                var (_, id, err) = await Media.UploadAsync(s, file.Name, file.ContentType, file.Size, await Me.IdAsync(), false);
+                if (err is not null) { Error = err; busy = false; return; }
+                editing!.FileId = id;
+            }
+            catch (Exception ex) { Error = "Fayl yuklanmadi: " + ex.Message; busy = false; return; }
+        }
+        var (_, e2) = await MaterialsSvc.SaveAsync(editing!, await Me.IdAsync());
+        busy = false;
+        if (e2 is not null) { Error = e2; return; }
+        editing = null; Toasts.Ok("Saqlandi"); await LoadAsync();
+    }
+
+    private async Task DeleteAsync(int id) { if (!await ConfirmAsync("Materialni o'chirasizmi?")) return; await MaterialsSvc.DeleteAsync(id, await Me.IdAsync()); await LoadAsync(); }
+}

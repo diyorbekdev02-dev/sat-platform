@@ -1,0 +1,63 @@
+@page "/admin"
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inherits AppPage
+@inject AnalyticsService Analytics
+@inject AcademyService Academy
+@inject ContentService Content
+
+<PageTitle>Admin paneli</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="grid c4 mb">
+        <div class="stat accent"><div class="label">O'quvchilar</div><div class="value">@c.Students</div><div class="sub">faol</div></div>
+        <div class="stat"><div class="label">O'qituvchilar / guruhlar</div><div class="value">@c.Teachers / @c.Groups</div></div>
+        <div class="stat"><div class="label">Bugun</div><div class="value">@c.TestsToday</div><div class="sub">test · @c.QuestionsToday ta savol yechildi</div></div>
+        <div class="stat"><div class="label">O'rtacha SAT ball</div><div class="value">@(c.AvgScore?.ToString() ?? "—")</div><div class="sub">davomat @(c.AvgAttendance?.ToString() ?? "—")% (30 kun)</div></div>
+    </div>
+    <div class="grid c4 mb">
+        <a class="stat" href="/admin/questions" style="text-decoration:none"><div class="label">Savollar banki</div><div class="value">@c.ActiveQuestions</div><div class="sub">faol savol</div></a>
+        <a class="stat" href="/admin/tests" style="text-decoration:none"><div class="label">Testlar</div><div class="value">@c.PublishedTests</div><div class="sub">chop etilgan</div></a>
+        <a class="stat" href="/admin/students" style="text-decoration:none"><div class="label">O'quvchi qo'shish</div><div class="value">+</div><div class="sub">yangi o'quvchi yoki guruh</div></a>
+        <a class="stat" href="/admin/settings" style="text-decoration:none"><div class="label">Sozlamalar</div><div class="value">⚙</div><div class="sub">adaptiv qoidalar, scoring</div></a>
+    </div>
+    <div class="grid c2 mb">
+        <div class="card"><div class="card-title"><h2>Eng kuchli guruhlar</h2><a class="small" href="/admin/analytics">Tahlil →</a></div>
+            <div class="table-wrap"><table class="table"><thead><tr><th>Guruh</th><th class="num">O'quvchi</th><th class="num">O'rt. ball</th><th class="num">Davomat</th></tr></thead><tbody>@foreach (var g in groups.Take(6)) { <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/groups/{g.GroupId}"))"><td class="bold">@g.Group<div class="tiny muted">@g.Teacher</div></td><td class="num">@g.Students</td><td class="num bold">@(g.AvgScore?.ToString() ?? "—")</td><td class="num">@(g.Attendance?.ToString() ?? "—")%</td></tr> }</tbody></table></div>
+        </div>
+        <div class="card"><div class="card-title"><h2>Markaz bo'yicha zaif skilllar</h2></div>
+            @if (skills.Count == 0) { <p class="muted small">Ma'lumot yo'q.</p> }
+            else { @foreach (var s in skills.Take(8)) { <div class="skill-row"><span class="name">@s.Skill <span class="tiny muted">(@s.Students o'quvchi)</span></span><div class="progress @(s.Accuracy < 50 ? "weak" : s.Accuracy > 75 ? "strong" : "medium")"><span style="width:@(s.Accuracy)%"></span></div><span class="pct">@s.Accuracy.ToString("0")%</span></div> } }
+        </div>
+    </div>
+    <div class="grid c2">
+        <div class="card"><div class="card-title"><h2>Bank qamrovi (kam savolli skilllar)</h2><a class="small" href="/admin/questions">Savollar →</a></div>
+            <div class="table-wrap"><table class="table"><thead><tr><th>Skill</th><th class="num">Oson</th><th class="num">O'rta</th><th class="num">Qiyin</th></tr></thead><tbody>@foreach (var s in coverage.OrderBy(x => x.Easy + x.Medium + x.Hard).Take(8)) { <tr><td>@s.Skill<div class="tiny muted">@s.Domain</div></td><td class="num @(s.Easy < 5 ? "level-weak" : "")">@s.Easy</td><td class="num @(s.Medium < 5 ? "level-weak" : "")">@s.Medium</td><td class="num @(s.Hard < 5 ? "level-weak" : "")">@s.Hard</td></tr> }</tbody></table></div>
+        </div>
+        <div class="card"><div class="card-title"><h2>So'nggi faollik</h2><a class="small" href="/admin/audit">Audit →</a></div>
+            <div class="list">@foreach (var a in audit.Take(10)) { <div class="list-item"><div class="grow"><div class="title small">@a.Action <span class="muted">@a.EntityType #@a.EntityId</span></div><div class="sub">@(a.UserId is int u && names.TryGetValue(u, out var n) ? n : "tizim") · @Tz.Fmt(a.CreatedAt)</div></div></div> }</div>
+        </div>
+    </div>
+}
+
+@code {
+    private AnalyticsService.CenterStats c = new(0, 0, 0, 0, 0, null, null, 0, 0);
+    private List<AnalyticsService.GroupPerf> groups = [];
+    private List<AnalyticsService.SkillAggregate> skills = [];
+    private List<(int SkillId, string Skill, string Domain, Section Section, int Easy, int Medium, int Hard)> coverage = [];
+    private List<AuditLog> audit = [];
+    private Dictionary<int, string> names = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Admin paneli");
+        c = await Analytics.CenterAsync();
+        groups = await Analytics.GroupPerformanceAsync();
+        skills = await Analytics.GroupSkillsAsync(null);
+        coverage = await Content.CoverageAsync();
+        audit = await Academy.AuditAsync(10);
+        names = await Academy.UserNamesAsync(audit.Where(a => a.UserId is not null).Select(a => a.UserId!.Value));
+        Loading = false;
+    }
+}

@@ -1,0 +1,137 @@
+@page "/dashboard"
+@attribute [Authorize(Roles = "Student")]
+@inherits AppPage
+@inject AnalyticsService Analytics
+@inject TestEngineService Engine
+@inject PracticeService Practice
+
+<PageTitle>Bosh sahifa</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span> Yuklanmoqda...</div> }
+else if (d is not null)
+{
+    @if (Welcome == "1" || !d.HasDiagnostic)
+    {
+        <div class="alert accent card mb" style="border-color:var(--accent)">
+            <div class="row between">
+                <div>
+                    <div class="bold">Xush kelibsiz, @firstName! 👋</div>
+                    <div class="small">Birinchi qadam — <b>Diagnostik test</b>. U hozirgi darajangizni (taxminiy SAT ball) va zaif mavzularingizni aniqlab beradi. Shundan keyin tizim har kuni nimani mashq qilishni aytib turadi.</div>
+                </div>
+                <a class="btn primary" href="/tests"><Icon Name="play" /> Diagnostik testni boshlash</a>
+            </div>
+        </div>
+    }
+
+    @if (activeAttempt is not null)
+    {
+        <div class="alert warn mb"><div class="row between"><span>⏱ Sizda tugallanmagan test bor: <b>@activeAttempt.Test.Title</b></span><a class="btn sm primary" href="/attempt/@activeAttempt.Id">Davom ettirish</a></div></div>
+    }
+    @if (activePractice is not null)
+    {
+        <div class="alert mb"><div class="row between"><span>🎯 Tugallanmagan mashq: <b>@activePractice.Title</b></span><a class="btn sm" href="/practice/@activePractice.Id">Davom ettirish</a></div></div>
+    }
+
+    <div class="grid c4 mb">
+        <div class="stat accent">
+            <div class="label">Joriy SAT ball</div>
+            <div class="value">@(d.CurrentScore?.ToString() ?? "—")</div>
+            <div class="sub">@(d.CurrentScore is null ? "Diagnostik testdan so'ng" : $"R&W {d.CurrentRw} · Math {d.CurrentMath}")</div>
+        </div>
+        <div class="stat">
+            <div class="label">Maqsad ball</div>
+            <div class="value">@(d.TargetScore?.ToString() ?? "—")</div>
+            <div class="sub">@(AnalyticsService.TargetProgress(d.CurrentScore, d.TargetScore) is int p ? $"Progress: {p}%" : d.TargetScore is null ? "Profilda belgilang" : "")</div>
+            @if (AnalyticsService.TargetProgress(d.CurrentScore, d.TargetScore) is int pp) { <div class="progress mt-s"><span style="width:@pp%"></span></div> }
+        </div>
+        <div class="stat">
+            <div class="label">O'zgarish</div>
+            <div class="value @(d.Improvement > 0 ? "level-strong" : d.Improvement < 0 ? "level-weak" : "")">@(d.Improvement is int i ? (i >= 0 ? "+" : "") + i : "—")</div>
+            <div class="sub">oxirgi testga nisbatan</div>
+        </div>
+        <div class="stat">
+            <div class="label">Streak</div>
+            <div class="value">🔥 @d.Streak</div>
+            <div class="sub">@(d.PracticedToday ? "bugun mashq qildingiz" : "bugun hali mashq qilmadingiz")</div>
+        </div>
+    </div>
+
+    <h2 class="mb-s">Bugun nimani mashq qilish kerak?</h2>
+    @if (d.Recommendations.Count == 0)
+    {
+        <div class="card mb"><div class="empty"><div class="big">🎯</div><h3>Tavsiyalar hali yo'q</h3><p class="small">Diagnostik test yoki bir nechta mashq ishlang — tizim zaif skilllaringizni aniqlab, aniq tavsiya beradi.</p><a class="btn primary mt-s" href="/practice">Mashq qilish</a></div></div>
+    }
+    else
+    {
+        <div class="stack mb">
+            @foreach (var r in d.Recommendations)
+            {
+                <div class="reco">
+                    <div class="grow">
+                        <div class="title">@r.Skill <span class="badge @(r.Section == Section.RW ? "rw" : "math")">@Labels.SectionShort(r.Section)</span></div>
+                        <div class="small muted">@r.Reason · @r.Questions ta savol · @Labels.Difficulty(r.Difficulty)</div>
+                    </div>
+                    <a class="btn primary" href="/practice/new?skill=@r.SkillId&count=@r.Questions&difficulty=@((int)r.Difficulty)&mode=@((int)PracticeMode.Recommended)"><Icon Name="play" /> Boshlash</a>
+                </div>
+            }
+        </div>
+    }
+
+    <div class="grid c2 mb">
+        <div class="card">
+            <div class="card-title"><h2>Zaif skilllar</h2><a class="small" href="/analytics">Barchasi →</a></div>
+            @if (d.WeakSkills.Count == 0) { <p class="muted small">Zaif skilllar aniqlanmagan. @(d.QuestionsSolved == 0 ? "Hali savol ishlamadingiz." : "Davom eting!")</p> }
+            else { <SkillBars Stats="d.WeakSkills" /> }
+        </div>
+        <div class="card">
+            <div class="card-title"><h2>Tezkor harakatlar</h2></div>
+            <div class="grid c2">
+                <a class="btn" href="/tests"><Icon Name="tests" /> To'liq SAT</a>
+                <a class="btn" href="/practice"><Icon Name="target" /> Mashq</a>
+                <a class="btn" href="/mistakes"><Icon Name="x-circle" /> Xatolarim @(d.UnresolvedMistakes > 0 ? $"({d.UnresolvedMistakes})" : "")</a>
+                <a class="btn" href="/analytics"><Icon Name="chart" /> Progressim</a>
+            </div>
+            <dl class="kv mt">
+                <dt>Yechilgan savollar</dt><dd class="bold">@d.QuestionsSolved</dd>
+                <dt>Umumiy aniqlik</dt><dd class="bold">@d.OverallAccuracy%</dd>
+                <dt>Testlar / mashqlar</dt><dd class="bold">@d.TestCount / @d.PracticeCount</dd>
+                <dt>Davomat</dt><dd class="bold">@(d.AttendanceRate is double a ? $"{a}%" : "—")</dd>
+            </dl>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-title"><h2>Oxirgi testlar</h2><a class="small" href="/tests">Barchasi →</a></div>
+        @if (d.RecentScores.Count == 0) { <p class="muted small">Hali test ishlanmagan.</p> }
+        else
+        {
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th>Test</th><th>Sana</th><th class="num">Umumiy</th><th class="num">R&W</th><th class="num">Math</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var s in d.RecentScores.AsEnumerable().Reverse())
+                    {
+                        <tr><td>@s.Title</td><td>@Tz.FmtDate(s.Date)</td><td class="num bold">@s.Total</td><td class="num">@s.Rw</td><td class="num">@s.Math</td><td><a class="btn sm" href="/attempt/@s.AttemptId/result">Natija</a></td></tr>
+                    }
+                </tbody></table></div>
+        }
+    </div>
+}
+
+@code {
+    [SupplyParameterFromQuery] public string? Welcome { get; set; }
+    private StudentDashboard? d;
+    private TestAttempt? activeAttempt;
+    private Data.PracticeSession? activePractice;
+    private string firstName = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Bosh sahifa");
+        firstName = (await Me.NameAsync()).Split(' ').FirstOrDefault() ?? "";
+        var sid = await Me.StudentIdAsync() ?? 0;
+        d = await Analytics.DashboardAsync(sid);
+        activeAttempt = await Engine.ActiveAttemptAsync(sid);
+        activePractice = await Practice.ActiveAsync(sid);
+        Loading = false;
+    }
+}

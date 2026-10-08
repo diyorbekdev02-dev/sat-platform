@@ -1,0 +1,82 @@
+@page "/mistakes"
+@attribute [Authorize(Roles = "Student")]
+@inherits AppPage
+@inject PracticeService PracticeSvc
+
+<PageTitle>Xatolarim</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="row between mb">
+        <div class="row">
+            <div class="chips">
+                <button class="chip @(section is null ? "active" : "")" @onclick="() => Set(null)">Hammasi</button>
+                <button class="chip @(section == Section.RW ? "active" : "")" @onclick="() => Set(Section.RW)">R&W</button>
+                <button class="chip @(section == Section.Math ? "active" : "")" @onclick="() => Set(Section.Math)">Math</button>
+            </div>
+            <div class="chips">
+                <button class="chip @(sort == "recent" ? "active" : "")" @onclick="@(() => SetSort("recent"))">So'nggi</button>
+                <button class="chip @(sort == "repeated" ? "active" : "")" @onclick="@(() => SetSort("repeated"))">Ko'p takrorlangan</button>
+                <button class="chip @(unresolved ? "active" : "")" @onclick="() => { unresolved = !unresolved; _ = LoadAsync(); }">Faqat hal qilinmagan</button>
+            </div>
+        </div>
+        <a class="btn primary" href="@MistakeLink"><Icon Name="target" /> Xatolarim ustida mashq</a>
+    </div>
+
+    @if (groups.Count == 0)
+    {
+        <div class="card"><div class="empty"><div class="big">🎉</div><h3>Xatolar yo'q!</h3><p class="small">Hali xato qilmadingiz yoki barchasini hal qildingiz. Mashqni davom eting.</p></div></div>
+    }
+    else
+    {
+        <div class="grid c3 mb">
+            @foreach (var g in groups)
+            {
+                <button class="card" style="text-align:left;cursor:pointer;border-color:@(skillId == g.SkillId ? "var(--accent)" : "var(--border)")" @onclick="() => { skillId = skillId == g.SkillId ? null : g.SkillId; _ = LoadAsync(); }">
+                    <div class="row between"><b>@g.Skill</b><span class="badge @(g.Section == Section.RW ? "rw" : "math")">@Labels.SectionShort(g.Section)</span></div>
+                    <div class="small muted">@g.Domain</div>
+                    <div class="row mt-s"><span class="badge danger">@g.Unresolved hal qilinmagan</span><span class="badge">@g.Count jami</span></div>
+                </button>
+            }
+        </div>
+        <div class="card pad-0">
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th>Savol</th><th>Skill</th><th class="num">Xato soni</th><th>Oxirgi xato</th><th>Holat</th><th></th></tr></thead>
+                <tbody>
+                    @foreach (var m in list)
+                    {
+                        <tr class="click" @onclick="@(() => Nav.NavigateTo($"/mistakes/{m.QuestionId}"))">
+                            <td>@ContentService.Preview(m.Question.Text, 80)</td>
+                            <td><span class="badge">@m.Question.Skill.Name</span></td>
+                            <td class="num bold">@m.MistakeCount</td>
+                            <td>@Tz.Fmt(m.LastWrongAt)</td>
+                            <td><span class="badge @(m.IsResolved ? "ok" : "danger")">@(m.IsResolved ? "Hal qilingan" : "Hal qilinmagan")</span></td>
+                            <td><a class="btn sm" href="/mistakes/@m.QuestionId">Ko'rish</a></td>
+                        </tr>
+                    }
+                </tbody></table></div>
+        </div>
+    }
+}
+
+@code {
+    private Section? section;
+    private int? skillId;
+    private string sort = "recent";
+    private bool unresolved = true;
+    private List<MistakeGroup> groups = [];
+    private List<StudentMistake> list = [];
+    private int sid;
+    private string MistakeLink => $"/practice/new?mode={(int)PracticeMode.Mistake}" + (section is Section s ? $"&section={(int)s}" : "");
+
+    protected override async Task OnInitializedAsync() { SetTitle("Xatolarim"); sid = await Me.StudentIdAsync() ?? 0; await LoadAsync(); Loading = false; }
+    private async Task LoadAsync()
+    {
+        groups = await PracticeSvc.MistakeGroupsAsync(sid, section, unresolved);
+        list = await PracticeSvc.MistakesAsync(sid, section, skillId, sort, unresolved);
+        StateHasChanged();
+    }
+    private void Set(Section? s) { section = s; skillId = null; _ = LoadAsync(); }
+    private void SetSort(string s) { sort = s; _ = LoadAsync(); }
+}
