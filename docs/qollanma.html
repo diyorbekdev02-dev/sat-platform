@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<title>SAT Platform — Foydalanuvchi qo'llanmasi</title>
+<style>
+  @page { size: A4; margin: 18mm 16mm 20mm 16mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "Segoe UI", Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #121a2e; margin: 0; }
+  h1 { font-size: 26pt; margin: 0 0 4px; color: #2f5bea; letter-spacing: -.01em; }
+  h2 { font-size: 17pt; margin: 26px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #2f5bea; color: #1b2a5c; page-break-after: avoid; }
+  h3 { font-size: 13pt; margin: 18px 0 6px; color: #1b2a5c; page-break-after: avoid; }
+  p { margin: 0 0 8px; }
+  ul, ol { margin: 0 0 10px; padding-left: 22px; }
+  li { margin-bottom: 3px; }
+  table { border-collapse: collapse; width: 100%; margin: 8px 0 12px; font-size: 10pt; page-break-inside: avoid; }
+  th, td { border: 1px solid #c9d2e3; padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: #eef2fb; }
+  code { font-family: Consolas, monospace; font-size: 10pt; background: #f1f4fa; padding: 1px 4px; border-radius: 3px; }
+  .cover { height: 240mm; display: flex; flex-direction: column; justify-content: center; page-break-after: always; }
+  .cover .big { font-size: 40pt; font-weight: 800; color: #2f5bea; line-height: 1.1; }
+  .cover .sub { font-size: 16pt; color: #5f6b85; margin-top: 10px; }
+  .cover .meta { margin-top: 40px; color: #5f6b85; font-size: 11pt; }
+  .tip { background: #eef2fb; border-left: 4px solid #2f5bea; padding: 8px 12px; margin: 10px 0; border-radius: 4px; }
+  .warn { background: #fff6e5; border-left: 4px solid #d97706; padding: 8px 12px; margin: 10px 0; border-radius: 4px; }
+  .shot { margin: 10px 0 14px; page-break-inside: avoid; }
+  .shot img { width: 100%; border: 1px solid #c9d2e3; border-radius: 6px; }
+  .shot .cap { font-size: 9.5pt; color: #5f6b85; margin-top: 4px; }
+  .toc li { margin-bottom: 2px; }
+  .page { page-break-before: always; }
+  .kbd { display: inline-block; border: 1px solid #c9d2e3; border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; font-size: 9.5pt; background: #fff; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <div class="big">SAT Platform</div>
+  <div class="sub">Digital SAT tayyorlov platformasi — foydalanuvchi qo'llanmasi</div>
+  <div class="meta">
+    O'quvchi · O'qituvchi · Administrator · Ota-ona<br>
+    Versiya 1.0 · Oktabr 2026<br>
+    Sayt: <b>https://sat-platform-9jc4.onrender.com</b> · Telegram bot: <b>@this_is_Personalbot</b>
+  </div>
+</div>
+
+<h2>Mundarija</h2>
+<ol class="toc">
+  <li>Platforma nima va qanday ishlaydi</li>
+  <li>Kirish va ro'yxatdan o'tish (sayt va Telegram bot)</li>
+  <li>O'quvchi uchun: bosh sahifa, testlar, test oynasi, mashq, xatolar, tahlil, materiallar, uy vazifasi, profil</li>
+  <li>O'qituvchi va assistent uchun: guruhlar, o'quvchilar, davomat, test tayinlash, uy vazifasi, tahlil</li>
+  <li>Administrator uchun: savollar banki, test builder, o'quvchilar, xodimlar, guruhlar, materiallar, sozlamalar, audit</li>
+  <li>Ota-ona uchun</li>
+  <li>Telegram bot buyruqlari va bildirishnomalar</li>
+  <li>Tez-tez so'raladigan savollar</li>
+  <li>Demo hisoblar</li>
+</ol>
+
+<h2>1. Platforma nima va qanday ishlaydi</h2>
+<p>SAT Platform — o'quv markazi uchun Digital SAT tayyorlov tizimi. Uning markazida o'quv sikli turadi:</p>
+<div class="tip"><b>Diagnostik test → natija → zaif skilllar → mavzu bo'yicha mashq → xatolarni ko'rib chiqish → qayta mashq → to'liq SAT mock → ball → progress tahlili → keyingi mashq.</b></div>
+<p>O'quvchi har kirganda bosh sahifa «Bugun nimani mashq qilish kerak?» degan savolga javob beradi. O'qituvchi o'z guruhlarini, davomatni va o'quvchilar progressini kuzatadi. Administrator savollar banki, testlar, o'quvchilar va sozlamalarni boshqaradi. Ota-ona farzandining ballari, davomati va zaif mavzularini ko'radi.</p>
+
+<h3>Rollar</h3>
+<table>
+  <tr><th>Rol</th><th>Nima qila oladi</th></tr>
+  <tr><td>Super admin / Admin</td><td>Hamma narsa: savollar, testlar, o'quvchilar, xodimlar, guruhlar, sozlamalar, audit. Super admin — boshqa adminlarni ham boshqaradi.</td></tr>
+  <tr><td>O'qituvchi</td><td>Faqat o'ziga biriktirilgan guruhlar va o'quvchilar: davomat, test tayinlash, uy vazifasi, progress. Admin ruxsat bersa — savollar bankida ham ishlaydi.</td></tr>
+  <tr><td>Assistent</td><td>O'qituvchi kabi, lekin cheklangan: davomat, o'quvchilar ro'yxati, uy vazifasini tekshirish, progressni ko'rish.</td></tr>
+  <tr><td>O'quvchi</td><td>Testlar, mashq, xatolar, tahlil, materiallar, uy vazifasi.</td></tr>
+  <tr><td>Ota-ona</td><td>Faqat ko'radi: farzandining ballari, testlari, davomati, zaif skilllari.</td></tr>
+</table>
+
+<h2 class="page">2. Kirish va ro'yxatdan o'tish</h2>
+<div class="shot"><img src="img/login.png" alt="Kirish oynasi"><div class="cap">Kirish oynasi: telefon raqam va parol.</div></div>
+<h3>Parol bilan kirish</h3>
+<ol>
+  <li>Saytni oching, telefon raqamingizni (<code>+998 90 123 45 67</code>) va parolni kiriting.</li>
+  <li>«Kirish» tugmasini bosing. Rolingizga qarab bosh sahifa ochiladi.</li>
+</ol>
+<h3>Telegram kodi bilan kirish (parolni unutganda ham)</h3>
+<ol>
+  <li>Kirish oynasida «Telegram kodi bilan kirish» ni bosing va raqamingizni kiriting.</li>
+  <li>Agar raqamingiz botga bog'lanmagan bo'lsa, «Telegram botni ochish» tugmasi chiqadi: botda <b>Start</b> ni bosing va «Telefon raqamni yuborish» tugmasini bosing.</li>
+  <li>5 xonali kod botga keladi — saytga kiriting. Keyin Profil bo'limida yangi parol o'rnating.</li>
+</ol>
+<h3>Saytda ro'yxatdan o'tish</h3>
+<ol>
+  <li>«Ro'yxatdan o'tish» yorlig'ini tanlang, rolni belgilang: <b>O'quvchi</b> yoki <b>Ota-ona</b>.</li>
+  <li>Telefon raqamni kiriting → kod Telegram botga keladi → kodni tasdiqlang.</li>
+  <li>Ism-familiya, parol kiriting. O'quvchi maqsad ballini (masalan 1400) yozishi mumkin; ota-ona farzandining <b>ota-ona kodini</b> kiritadi (kod o'quvchi profilida ko'rsatiladi).</li>
+</ol>
+<h3>Telegram botning o'zida ro'yxatdan o'tish</h3>
+<ol>
+  <li><b>@this_is_Personalbot</b> ni oching, <b>Start</b> bosing, «Telefon raqamni yuborish» ni bosing.</li>
+  <li>Raqam ro'yxatda bo'lmasa bot so'raydi: kimsiz (o'quvchi / ota-ona) → ism-familiya → (ota-ona uchun) farzand kodi.</li>
+  <li>Bot saytga kirish havolasini yuboradi (15 daqiqa amal qiladi). Saytda Profil → Parol bo'limida parol o'rnating — keyin telefon va parol bilan ham kira olasiz.</li>
+  <li>Istalgan vaqt <code>/login</code> buyrug'i yangi kirish havolasini beradi.</li>
+</ol>
+<div class="warn">O'qituvchi, assistent va admin hisoblarini faqat administrator yaratadi (Xodimlar va ota-onalar bo'limi). Mustaqil ro'yxatdan o'tishni admin Sozlamalarda o'chirib qo'yishi mumkin.</div>
+
+<h2 class="page">3. O'quvchi uchun</h2>
+<h3>3.1. Bosh sahifa</h3>
+<div class="shot"><img src="img/dashboard.png" alt="O'quvchi bosh sahifasi"><div class="cap">Bosh sahifa: joriy ball, maqsad, o'zgarish, streak, tavsiya qilingan mashq, zaif skilllar, oxirgi testlar.</div></div>
+<ul>
+  <li><b>Joriy SAT ball</b> — oxirgi to'liq testning taxminiy bali (R&amp;W + Math). Diagnostik testdan so'ng paydo bo'ladi.</li>
+  <li><b>Maqsad ball</b> va unga progress (400 dan maqsadgacha bo'lgan yo'lning necha foizi bosib o'tilgani).</li>
+  <li><b>O'zgarish</b> — oldingi testga nisbatan farq. <b>Streak</b> — ketma-ket necha kun mashq qilganingiz.</li>
+  <li><b>Bugun nimani mashq qilish kerak?</b> — tizim eng zaif, eng sekin va eng ko'p xato qilingan skilllardan tavsiya beradi. «Boshlash» bosilsa mashq darhol boshlanadi.</li>
+</ul>
+<div class="tip">Birinchi qadam — <b>Diagnostik test</b> (Testlar bo'limida). U darajangizni va zaif mavzularingizni aniqlab beradi; shundan keyin tavsiyalar ishga tushadi.</div>
+
+<h3>3.2. Testlar</h3>
+<p>«Testlar» bo'limida mavjud testlar: Diagnostik, To'liq SAT (mock), Bo'lim testi (faqat R&amp;W yoki Math), Modul va Mavzu testlari. Tayinlangan testlarda muddat va urinishlar soni ko'rsatiladi. «Mening urinishlarim» yorlig'ida barcha natijalaringiz.</p>
+<div class="shot"><img src="img/pretest.png" alt="Testdan oldingi tekshiruv"><div class="cap">Testni boshlashdan oldin: qurilma tekshiruvi va test tuzilishi.</div></div>
+<p>«Testni boshlash» bosilganda tizim internet, brauzer, ekran va lokal saqlashni tekshiradi, test tuzilishini (modullar, vaqt, tanaffus) ko'rsatadi. Tasdiqlagach taymer ishga tushadi.</p>
+
+<h3>3.3. Test oynasi</h3>
+<div class="shot"><img src="img/test.png" alt="Test oynasi"><div class="cap">Chapda passage/kontekst, o'ngda savol va variantlar; yuqorida modul nomi, taymer va Tools; pastda Back/Next va savollar jadvali.</div></div>
+<ul>
+  <li><b>Taymer</b> har modul uchun alohida (R&amp;W 32 daqiqa, Math 35 daqiqa standart). 5 daqiqa qolganda qizaradi. Ko'z belgisi bilan yashirish mumkin. Vaqt serverda hisoblanadi — sahifani yangilash yoki internet uzilishi vaqtni to'xtatmaydi.</li>
+  <li><b>Javob</b> — variantni bosing (yoki klaviaturada <span class="kbd">A</span> <span class="kbd">B</span> <span class="kbd">C</span> <span class="kbd">D</span>). Har bir javob darhol saqlanadi. Internet uzilsa javoblar brauzerda saqlanib, ulanish qaytgach yuboriladi.</li>
+  <li><b>Chizib tashlash</b> — variant o'ng tomonidagi harfni bosing; bu faqat sizning belgingiz, javob hisobiga ta'sir qilmaydi.</li>
+  <li><b>Belgilash (Flag)</b> — savolga keyin qaytish uchun (<span class="kbd">F</span>).</li>
+  <li><b>Savollar jadvali</b> — pastdagi «Question N of M» tugmasi (<span class="kbd">G</span>): javob berilgan, berilmagan va belgilangan savollar; istalgan savolga o'tish.</li>
+  <li><b>Math SPR (ochiq javob)</b> — butun son, manfiy son, o'nlik kasr (0.75) yoki oddiy kasr (3/4). Ko'pi bilan 5 ta belgi (manfiy bo'lsa 6). 2/3 ni .666 yoki .667 deb yozish ham to'g'ri hisoblanadi.</li>
+  <li><b>Tools</b>: Math'da kalkulyator va reference sheet (formulalar); R&amp;W'da matnni bo'yash (annotation) va line reader (qator chizg'ichi); klaviatura tugmalari ro'yxati; testdan chiqish.</li>
+</ul>
+<div class="shot"><img src="img/test-grid.png" alt="Savollar jadvali"><div class="cap">Savollar jadvali va «Modulni yakunlash».</div></div>
+<p><b>Module Review.</b> Oxirgi savoldan keyin (yoki jadvaldan) «Review» ochiladi: nechta javob berilgan, javobsiz va belgilangan savollar. Istalganiga qaytish mumkin. «Modulni yakunlash» bosilgach modulga qaytib bo'lmaydi. Vaqt tugasa modul avtomatik yakunlanadi.</p>
+<p><b>Adaptiv routing.</b> Diagnostik va to'liq testlarda 1-modul natijasiga qarab 2-modul osonroq (Easy) yoki qiyinroq (Hard) bo'ladi. Hard yo'nalishda yuqoriroq ball olish mumkin.</p>
+<p><b>Tanaffus.</b> R&amp;W bo'limidan keyin 10 daqiqa tanaffus (taymer bilan). «Tanaffusni tugatish» bilan erta davom etish mumkin.</p>
+<div class="warn">Test faqat bitta oynada ochiq bo'lishi kerak. Ikkinchi oynada «Bu test boshqa oynada ochiq» xabari chiqadi. Brauzer yopilib qolsa, 20 soniyadan so'ng shu yerdan davom ettirish mumkin — javoblar va vaqt saqlanadi.</div>
+
+<h3>3.4. Natija va javoblarni ko'rish</h3>
+<p>Test tugagach umumiy ball, R&amp;W va Math ballari, oldingi test bilan farq va shu testdagi skilllar aniqligi ko'rsatiladi. «Javoblarni ko'rish» — har bir savol: sizning javobingiz, to'g'ri javob, sarflangan vaqt, skill, qiyinlik va <b>izoh (explanation)</b>, bo'lsa video izoh. «Xato», «Belgilangan» filtrlari bor. Xato savol ostida «Shu skillni mashq qilish» tugmasi.</p>
+
+<h3>3.5. Mashq</h3>
+<div class="shot"><img src="img/practice.png" alt="Mashq sahifasi"><div class="cap">Mashq: bo'lim tanlash, tezkor mashq, tavsiyalar, tarix.</div></div>
+<ul>
+  <li><b>Bo'lim → Domain → Skill</b> bo'yicha maxsus mashq: qiyinlik, savollar soni (1–60) va vaqt (ixtiyoriy).</li>
+  <li><b>Tezkor mashq</b>: 10 / 20 / 30 ta savol. <b>Zaif skilllar</b>: tizim aniqlagan zaif mavzulardan. <b>Xatolarim ustida</b>: oldingi xatolar va shu skilldan yangi savollar.</li>
+  <li>Mashqda har javobdan keyin darhol to'g'ri/noto'g'ri va izoh ko'rsatiladi («Javobni tasdiqlash» bosilgach).</li>
+  <li>Natija sahifasida aniqlik, o'rtacha vaqt, skilllar bo'yicha natija, «Ko'rib chiqish» va «Yana mashq qilish».</li>
+</ul>
+
+<h3>3.6. Xatolarim</h3>
+<p>Test va mashqlarda xato qilingan savollar avtomatik to'planadi. Skill bo'yicha guruhlar, «So'nggi» / «Ko'p takrorlangan» tartiblash, «Faqat hal qilinmagan» filtri. Savolni ochib izohni o'qing; keyinchalik shu savolni to'g'ri yechsangiz u «hal qilingan» bo'ladi.</p>
+
+<h3>3.7. Tahlil (Mening progressim)</h3>
+<div class="shot"><img src="img/analytics.png" alt="Tahlil"><div class="cap">Tahlil: ball dinamikasi, zaif skilllar, tavsiyalar; yorliqlar: Skilllar, Testlar, Xatolar, Vaqt, Davomat, Uy vazifasi.</div></div>
+<ul>
+  <li><b>Ball dinamikasi</b> — barcha to'liq testlar grafigi (umumiy, R&amp;W, Math).</li>
+  <li><b>Skilllar</b> — har bir skill aniqligi: qizil (zaif, 50% dan past), sariq (o'rta), yashil (kuchli, 75% dan yuqori).</li>
+  <li><b>Vaqt</b> — o'rtacha vaqt, to'g'ri/xato javoblarda, qiyinlik va skill bo'yicha eng sekin mavzular.</li>
+</ul>
+
+<h3>3.8. Materiallar, uy vazifasi, profil, bildirishnomalar</h3>
+<ul>
+  <li><b>Materiallar</b> — o'qituvchi/admin yuklagan fayllar va havolalar, kategoriya bo'yicha.</li>
+  <li><b>Uy vazifasi</b> — berilgan vazifalar, muddat va holat. Mashq turidagi vazifa «Boshlash» bilan ochiladi; test turi — Testlar sahifasida; fayl turi — matn yoki fayl yuklab topshiriladi. Tekshirilgach ball va o'qituvchi izohi ko'rinadi.</li>
+  <li><b>Profil</b> — ism, maqsad ball, bildirishnoma sozlamalari, parol, Telegram holati, guruhlaringiz va <b>ota-ona kodi</b> (ota-onangizga bering).</li>
+  <li><b>Bildirishnomalar</b> (qo'ng'iroq belgisi) — natijalar, tayinlangan testlar, uy vazifalari, davomat.</li>
+</ul>
+
+<h2 class="page">4. O'qituvchi va assistent uchun</h2>
+<div class="shot"><img src="img/teacher.png" alt="O'qituvchi paneli"><div class="cap">O'qituvchi paneli: guruhlar, bugungi darslar, e'tibor talab qiladigan o'quvchilar, so'nggi natijalar.</div></div>
+<h3>4.1. Guruhlar va o'quvchilar</h3>
+<p>«Guruhlar» — sizga biriktirilgan guruhlar: o'rtacha ball, aniqlik, davomat. Guruh ichida yorliqlar: O'quvchilar (ball, maqsad, aniqlik, davomat, eng zaif skill), Progress (guruhning zaif skilllari, reyting), Davomat (30 kunlik jadval), Testlar, Uy vazifalari. «O'quvchilar» bo'limida qidirish va tartiblash (ism, ball, eng zaif, faollik). O'quvchini ochsangiz to'liq progress paneli (tahlil, skilllar, testlar, xatolar, vaqt, davomat, uy vazifasi) ko'rinadi.</p>
+<div class="tip">O'qituvchi faqat o'z guruhidagi o'quvchilarni ko'radi va o'quvchi javoblarini o'zgartira olmaydi.</div>
+<h3>4.2. Davomat</h3>
+<ol>
+  <li>«Davomat» → guruh va sanani tanlang (bugungi dars avtomatik tanlanadi).</li>
+  <li>Har bir o'quvchi uchun: Keldi / Kelmadi / Kechikdi (daqiqa bilan) / Sababli. «Hammasi keldi» tugmasi bor.</li>
+  <li>«Davomatni saqlash». Kelmagan va kechikkan o'quvchilarning ota-onasiga Telegram orqali xabar ketadi.</li>
+</ol>
+<h3>4.3. Test tayinlash</h3>
+<p>«Test tayinlash» → chop etilgan testni tanlang → guruh yoki alohida o'quvchi → boshlanish va muddat → urinishlar soni (bo'sh = cheksiz) → «Tayinlash». O'quvchilarga bildirishnoma ketadi. Ro'yxatdagi tayinlov yonidagi «Natijalar» — kim ishlagan, ballari, javoblari.</p>
+<h3>4.4. Uy vazifasi</h3>
+<p>«Uy vazifalari» → «Yangi vazifa»: sarlavha, tavsif, kimga (guruh/o'quvchi), tur:</p>
+<ul>
+  <li><b>Savollar (mashq)</b> — bo'lim/domain/skill, qiyinlik, savollar soni. O'quvchi mashq sifatida ishlaydi, natija avtomatik yoziladi.</li>
+  <li><b>Test</b> — chop etilgan test 1 urinish bilan tayinlanadi.</li>
+  <li><b>Fayl / matn</b> — o'quvchi fayl yoki matn topshiradi, siz baholaysiz.</li>
+</ul>
+<p>Vazifa sahifasida har bir o'quvchi holati, javoblari va «Baholash» (ball, maksimal, izoh). Bahodan keyin o'quvchiga bildirishnoma ketadi.</p>
+<h3>4.5. Tahlil</h3>
+<p>«Tahlil» — guruh/bo'lim filtri bilan skilllar bo'yicha aniqlik, guruhlar jadvali va o'quvchilar ro'yxati (eng zaiflar yuqorida).</p>
+
+<h2 class="page">5. Administrator uchun</h2>
+<div class="shot"><img src="img/admin.png" alt="Admin paneli"><div class="cap">Admin paneli: markaz statistikasi, guruhlar, zaif skilllar, bank qamrovi, so'nggi faollik.</div></div>
+<h3>5.1. Savollar banki</h3>
+<div class="shot"><img src="img/question-edit.png" alt="Savol tahrirlash"><div class="cap">Savol tahrirlash: bo'lim, domain, skill, qiyinlik, tur; passage, savol matni, variantlar, izoh, video.</div></div>
+<ul>
+  <li>Ro'yxatda qidirish (matn, #id, teg) va filtrlar: bo'lim, domain, skill, qiyinlik, holat, tur.</li>
+  <li><b>Yangi savol</b>: bo'lim/domain/skill/qiyinlik majburiy. Tur: Multiple choice (A–D, to'g'risini belgilang) yoki SPR (son javob; bir nechta qabul qilinadigan javob <code>|</code> bilan: <code>2/3|0.667</code>).</li>
+  <li>Muharrir: qalin, kursiv, ro'yxat, jadval, rasm yuklash, havola. Formulalar LaTeX ko'rinishida: <code>$x^2$</code> yoki <code>$$\frac{a}{b}$$</code> — o'quvchi ko'rinishida avtomatik render bo'ladi.</li>
+  <li><b>Holatlar</b>: Qoralama (testga tushmaydi), Tekshiruvda, Faol (ishlatiladi), Arxiv (yangi testga tanlanmaydi, eski urinishlar buzilmaydi). Faol savolda izoh bo'lishi shart.</li>
+  <li><b>Versiyalash</b>: savol matni o'zgartirilsa yangi versiya yaratiladi; eski urinishlar eski versiya bilan qoladi.</li>
+  <li>«Ko'rish» — o'quvchi ko'radigan ko'rinish. O'xshash savollar bo'lsa ogohlantirish chiqadi.</li>
+  <li><b>Import / Export</b> (JSON): ko'p savolni bir yo'la yuklash. Export namuna formatni beradi.</li>
+</ul>
+<h3>5.2. Test builder</h3>
+<div class="shot"><img src="img/test-builder.png" alt="Test builder"><div class="cap">Test builder: modullar (R&amp;W M1, M2 Easy, M2 Hard, Math M1, M2 Easy, M2 Hard), savollar, avto-generatsiya.</div></div>
+<ol>
+  <li>«Testlar» → «Yangi test»: nom, tur (Diagnostik, To'liq SAT, Bo'lim, Modul, Mavzu), adaptiv belgisi. Modullar skeleti avtomatik yaratiladi.</li>
+  <li>Har modulga savol qo'shish: «Savol qo'shish» (bankdan tanlash, filtr bilan) yoki «Avto-generatsiya» (savollar soni, qiyinlik va domain foizlari). Tartibni ↑↓ bilan o'zgartirish.</li>
+  <li>«Sozlamalar»: nom, tavsif, tanaffus, scoring versiyasi, modul vaqtlari, savollarni aralashtirish, hammaga ochiq.</li>
+  <li>«Preview» — testni o'quvchi ko'rinishida o'zingiz ishlab ko'rasiz (natija statistikaga kirmaydi).</li>
+  <li>«Chop etish» — validatsiya: modullar to'liq, savollar faol, vaqt bor, dublikat yo'q, adaptiv modullar soni qoidaga mos. Xatolar ro'yxati ko'rsatiladi.</li>
+  <li>Chop etilgan testni «Tayinlash» (guruh/o'quvchi, muddat, urinishlar). «Urinishlar» yorlig'ida natijalar va «Qayta hisoblash» (audit bilan).</li>
+</ol>
+<h3>5.3. O'quvchilar, xodimlar, guruhlar</h3>
+<ul>
+  <li><b>O'quvchilar</b>: filtrlar (ism, holat, guruh, ball), «O'quvchi qo'shish» (ism, telefon, parol, maqsad, guruh). O'quvchi sahifasida ma'lumotlarni tahrirlash, holat (Faol, Muzlatilgan, Ketgan, Bitirgan), guruhga biriktirish/chiqarish, ota-onani bog'lash, ota-ona kodi va to'liq progress.</li>
+  <li><b>Xodimlar va ota-onalar</b>: o'qituvchi, assistent, admin, ota-ona yaratish va tahrirlash; o'qituvchiga «Savollar bankiga ruxsat»; hisobni o'chirish/yoqish; parol o'rnatish.</li>
+  <li><b>Guruhlar</b>: nom, kurs, o'qituvchi, assistent, xona, dars kunlari va vaqti (o'qituvchi yoki xona band bo'lsa ogohlantiradi), o'quvchilarni qo'shish.</li>
+  <li><b>Materiallar</b>: fayl (PDF, Word, rasm, video, 25 MB gacha) yoki havola, kategoriya, ixtiyoriy guruh.</li>
+</ul>
+<h3>5.4. Sozlamalar</h3>
+<ul>
+  <li><b>Umumiy</b>: markaz nomi, zaif/kuchli skill chegaralari, skillni baholash uchun minimal savollar soni, tanaffus, modul vaqtlari, tavsiya savollar soni, mashq eslatmasi soati, standart scoring versiyasi, mustaqil ro'yxatdan o'tishga ruxsat.</li>
+  <li><b>Adaptiv qoidalar</b>: har bo'lim uchun 1-modul savollar soni va cutoff (shuncha to'g'ri javob — Hard, kam bo'lsa — Easy).</li>
+  <li><b>Scoring jadvali</b>: raw (to'g'ri javoblar) → scaled (200–800) jadvali, Hard/Easy/Standard yo'nalishlar uchun, versiyalangan. Biznes tasdiqlagan jadvalni «Tahrirlash» orqali <code>raw,scaled</code> qatorlar bilan kiriting.</li>
+  <li><b>Domain va skilllar</b>: SAT taksonomiyasini qo'shish/tahrirlash.</li>
+</ul>
+<h3>5.5. Audit jurnali</h3>
+<p>Kim, qachon, nima qilgani: savol/test yaratish va o'zgartirish, chop etish, tayinlash, o'quvchi va guruh o'zgarishlari, davomat, ballarni qayta hisoblash, sozlamalar.</p>
+
+<h2 class="page">6. Ota-ona uchun</h2>
+<p>Kirgach «Farzandim» sahifasi: joriy ball, maqsad, aniqlik, davomat, ball dinamikasi, zaif skilllar. Yorliqlar: Skilllar, Testlar (natijalar va javoblar), Xatolar, Vaqt, Davomat, Uy vazifasi. Bir nechta farzand bo'lsa yuqorida tanlash tugmalari. Yana bir farzandni Profil → «Farzandni bog'lash» orqali kod bilan qo'shish mumkin.</p>
+<p>Telegram'ga keladi: farzand darsga kelmasa yoki kechiksa, test natijasi chiqsa.</p>
+
+<h2>7. Telegram bot</h2>
+<table>
+  <tr><th>Buyruq</th><th>Vazifasi</th></tr>
+  <tr><td><code>/start</code></td><td>Boshlash: telefon raqamni yuborish (hisobni bog'lash yoki ro'yxatdan o'tish).</td></tr>
+  <tr><td><code>/login</code></td><td>Saytga parolsiz kirish havolasi (15 daqiqa amal qiladi).</td></tr>
+  <tr><td><code>/help</code></td><td>Buyruqlar ro'yxati.</td></tr>
+  <tr><td><code>/cancel</code></td><td>Boshlangan amalni bekor qilish.</td></tr>
+</table>
+<p><b>Bildirishnomalar</b> (Profil → Bildirishnomalar bo'limida yoqib/o'chirib qo'yiladi): test natijalari, davomat, uy vazifasi va tayinlangan testlar, kunlik mashq eslatmasi (bugun hali mashq qilmagan o'quvchilarga belgilangan soatda).</p>
+
+<h2>8. Tez-tez so'raladigan savollar</h2>
+<table>
+  <tr><th>Savol</th><th>Javob</th></tr>
+  <tr><td>Test paytida internet uzildi</td><td>Javoblar brauzerda saqlanadi, ulanish qaytgach yuboriladi. Taymer serverda — davom etadi. Sahifani yangilab «Davom ettirish» ni bosing.</td></tr>
+  <tr><td>«Bu test boshqa oynada ochiq»</td><td>Test boshqa yorliq/qurilmada ochiq. Uni yoping; 20 soniyadan so'ng «Qayta tekshirish» ni bosing.</td></tr>
+  <tr><td>Vaqt tugadi</td><td>Modul avtomatik yakunlanadi, berilgan javoblar hisoblanadi, keyingi modul (yoki natija) ochiladi.</td></tr>
+  <tr><td>Parolni unutdim</td><td>Kirish → «Parolni unutdingizmi?» → Telegram kodi bilan kiring → Profilda yangi parol.</td></tr>
+  <tr><td>Telegram kod kelmayapti</td><td>Botda Start bosib raqamingizni «Telefon raqamni yuborish» tugmasi orqali yuboring (qo'lda yozilgan raqam qabul qilinmaydi). Raqam saytda kiritilgan bilan bir xil bo'lishi kerak.</td></tr>
+  <tr><td>Testni to'xtatmoqchiman</td><td>Tools → «Testdan chiqish». Urinish natijasiz yakunlanadi va urinishlar sonidan hisoblanadi.</td></tr>
+  <tr><td>Ball qanday hisoblanadi?</td><td>Har bo'limda to'g'ri javoblar soni (raw) scoring jadvali orqali 200–800 ballga aylantiriladi; umumiy = R&amp;W + Math. Jadval admin Sozlamalarida.</td></tr>
+  <tr><td>Savol xato ko'rinadi</td><td>O'qituvchi yoki adminga savol raqamini (#id) ayting; admin savolni tuzatadi, eski natijalar o'zgarmaydi.</td></tr>
+  <tr><td>Mobil telefonda ishlaydimi?</td><td>Bosh sahifa, mashq, tahlil, materiallar — ha. To'liq test desktop/planshet uchun mo'ljallangan (katta ekran tavsiya etiladi).</td></tr>
+</table>
+
+<h2>9. Demo hisoblar</h2>
+<p>Platformani sinab ko'rish uchun (parol: <code>demo123</code>). Haqiqiy ishga tushirishdan oldin bu hisoblarni o'chirib yoki parollarini o'zgartirib qo'ying.</p>
+<table>
+  <tr><th>Rol</th><th>Telefon</th></tr>
+  <tr><td>Super admin</td><td>+998942922288</td></tr>
+  <tr><td>Admin</td><td>+998901111110</td></tr>
+  <tr><td>O'qituvchi (SAT Intensive A)</td><td>+998901111111</td></tr>
+  <tr><td>O'qituvchi (SAT Foundation B)</td><td>+998901111112</td></tr>
+  <tr><td>Assistent</td><td>+998901111113</td></tr>
+  <tr><td>O'quvchilar</td><td>+998902000000 … +998902000009</td></tr>
+  <tr><td>Ota-ona (Ali Valiyevning)</td><td>+998903000000</td></tr>
+</table>
+<p style="margin-top:30px;color:#5f6b85;font-size:9.5pt">SAT Platform · Foydalanuvchi qo'llanmasi · 2026</p>
+</body>
+</html>

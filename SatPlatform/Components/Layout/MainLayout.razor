@@ -89,22 +89,22 @@
             UserRole.Student =>
             [
                 new("/dashboard", "Bosh sahifa", "home"), new("/tests", "Testlar", "tests"), new("/practice", "Mashq", "target"), new("/mistakes", "Xatolarim", "x-circle"),
-                new("/analytics", "Tahlil", "chart"), new("/materials", "Materiallar", "book"), new("/homework", "Uy vazifasi", "clipboard"), new("/profile", "Profil", "user")
+                new("/analytics", "Tahlil", "chart"), new("/materials", "Materiallar", "book"), new("/homework", "Uy vazifasi", "clipboard"), new("/help", "Qo'llanma", "book"), new("/profile", "Profil", "user")
             ],
             UserRole.Teacher or UserRole.Assistant =>
             [
                 new("/teacher", "Bosh sahifa", "home"), new("/teacher/groups", "Guruhlar", "users"), new("/teacher/students", "O'quvchilar", "user"), new("/teacher/attendance", "Davomat", "calendar"),
                 new("/teacher/assign", "Test tayinlash", "tests"), new("/teacher/homework", "Uy vazifalari", "clipboard"), new("/teacher/analytics", "Tahlil", "chart"), new("/materials", "Materiallar", "book"),
-                new("", "", "", "Kontent"), new("/admin/questions", "Savollar banki", "database"), new("/profile", "Profil", "user")
+                new("", "", "", "Kontent"), new("/admin/questions", "Savollar banki", "database"), new("/help", "Qo'llanma", "book"), new("/profile", "Profil", "user")
             ],
-            UserRole.Parent => [new("/parent", "Farzandim", "home"), new("/parent/tests", "Testlar", "tests"), new("/parent/attendance", "Davomat", "calendar"), new("/profile", "Profil", "user")],
+            UserRole.Parent => [new("/parent", "Farzandim", "home"), new("/parent/tests", "Testlar", "tests"), new("/parent/attendance", "Davomat", "calendar"), new("/help", "Qo'llanma", "book"), new("/profile", "Profil", "user")],
             _ =>
             [
                 new("/admin", "Bosh sahifa", "home"),
                 new("", "", "", "Kontent"), new("/admin/questions", "Savollar banki", "database"), new("/admin/tests", "Testlar", "tests"), new("/admin/materials", "Materiallar", "book"),
                 new("", "", "", "O'quv markaz"), new("/admin/students", "O'quvchilar", "user"), new("/admin/users", "Xodimlar va ota-onalar", "users"), new("/admin/groups", "Guruhlar", "layers"),
                 new("/teacher/attendance", "Davomat", "calendar"), new("/teacher/homework", "Uy vazifalari", "clipboard"), new("/teacher/assign", "Test tayinlash", "send"),
-                new("", "", "", "Tahlil va sozlamalar"), new("/admin/analytics", "Tahlil", "chart"), new("/admin/settings", "Sozlamalar", "settings"), new("/admin/audit", "Audit jurnali", "shield"), new("/profile", "Profil", "user")
+                new("", "", "", "Tahlil va sozlamalar"), new("/admin/analytics", "Tahlil", "chart"), new("/admin/settings", "Sozlamalar", "settings"), new("/admin/audit", "Audit jurnali", "shield"), new("/help", "Qo'llanma", "book"), new("/profile", "Profil", "user")
             ]
         };
         var uid = await Me.IdAsync();

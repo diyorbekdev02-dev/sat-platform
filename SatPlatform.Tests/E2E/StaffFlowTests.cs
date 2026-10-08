@@ -113,7 +113,7 @@ public class StaffFlowTests(BrowserFixture f)
         if (!f.Available) return;
         var page = await f.NewPageAsync();
         await page.LoginAsync(AdminPhone, AdminPassword, "/admin");
-        foreach (var (path, title) in new[] { ("/admin/questions", "Savollar banki"), ("/admin/tests", "Testlar"), ("/admin/materials", "Materiallar"), ("/admin/students", "O'quvchilar"), ("/admin/users", "Xodimlar"), ("/admin/groups", "Guruhlar"), ("/admin/analytics", "Tahlil"), ("/admin/settings", "Sozlamalar"), ("/admin/audit", "Audit"), ("/teacher/assign", "Test tayinlash") })
+        foreach (var (path, title) in new[] { ("/admin/questions", "Savollar banki"), ("/admin/tests", "Testlar"), ("/admin/materials", "Materiallar"), ("/admin/students", "O'quvchilar"), ("/admin/users", "Xodimlar"), ("/admin/groups", "Guruhlar"), ("/admin/analytics", "Tahlil"), ("/admin/settings", "Sozlamalar"), ("/admin/audit", "Audit"), ("/teacher/assign", "Test tayinlash"), ("/help", "Qo'llanma") })
         {
             await page.GoAsync(path);
             await page.WaitForFunctionAsync("t => (document.querySelector('#page-title')?.textContent || '').includes(t)", title);

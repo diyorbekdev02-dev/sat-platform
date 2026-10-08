@@ -1,0 +1,36 @@
+@page "/help"
+@attribute [Authorize]
+@inherits AppPage
+
+<PageTitle>Qo'llanma</PageTitle>
+
+<div class="row between mb">
+    <div class="muted small">Platformadan foydalanish bo'yicha to'liq qo'llanma: kirish, testlar, mashq, o'qituvchi va admin bo'limlari, Telegram bot, savol-javoblar.</div>
+    <div class="row">
+        <a class="btn primary" href="/qollanma.pdf" download="SAT-Platform-qollanma.pdf"><Icon Name="download" /> PDF yuklab olish</a>
+        <a class="btn" href="/qollanma.pdf" target="_blank"><Icon Name="external" /> Yangi oynada ochish</a>
+    </div>
+</div>
+
+<div class="grid c4 mb">
+    @foreach (var (title, text, icon) in Quick)
+    {
+        <div class="card"><div class="row"><Icon Name="@icon" /><b>@title</b></div><div class="small muted mt-s">@text</div></div>
+    }
+</div>
+
+<div class="card pad-0" style="height:78vh">
+    <iframe src="/qollanma.pdf#toolbar=1&view=FitH" title="Qo'llanma" style="width:100%;height:100%;border:none"></iframe>
+</div>
+
+@code {
+    private static readonly (string, string, string)[] Quick =
+    [
+        ("Birinchi qadam", "Diagnostik testni ishlang — tizim zaif mavzularingizni aniqlab, har kuni nimani mashq qilishni aytadi.", "play"),
+        ("Test oynasi", "A/B/C/D tugmalari — javob, F — belgilash, G — savollar jadvali, ← → — oldingi/keyingi savol.", "tests"),
+        ("Internet uzilsa", "Javoblar brauzerda saqlanadi va ulanish qaytgach yuboriladi. Taymer serverda davom etadi.", "zap"),
+        ("Telegram bot", "@this_is_Personalbot: /start — hisobni bog'lash, /login — parolsiz kirish havolasi.", "telegram"),
+    ];
+
+    protected override void OnInitialized() => SetTitle("Qo'llanma");
+}

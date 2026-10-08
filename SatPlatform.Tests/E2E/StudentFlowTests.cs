@@ -50,7 +50,7 @@ public class StudentFlowTests(BrowserFixture f)
         Assert.Equal("Bosh sahifa", await page.Title());
         await page.WaitForSelectorAsync("text=Joriy SAT ball");
 
-        foreach (var (path, title) in new[] { ("/tests", "Testlar"), ("/practice", "Mashq"), ("/mistakes", "Xatolarim"), ("/analytics", "Mening progressim"), ("/materials", "Materiallar"), ("/homework", "Uy vazifasi"), ("/profile", "Profil"), ("/notifications", "Bildirishnomalar") })
+        foreach (var (path, title) in new[] { ("/tests", "Testlar"), ("/practice", "Mashq"), ("/mistakes", "Xatolarim"), ("/analytics", "Mening progressim"), ("/materials", "Materiallar"), ("/homework", "Uy vazifasi"), ("/profile", "Profil"), ("/notifications", "Bildirishnomalar"), ("/help", "Qo'llanma") })
         {
             await page.GoAsync(path);
             await page.WaitForFunctionAsync("t => (document.querySelector('#page-title')?.textContent || '').includes(t)", title);
