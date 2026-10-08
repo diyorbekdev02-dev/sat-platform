@@ -6,7 +6,9 @@ namespace SatPlatform.Tests.E2E;
 [Collection("e2e")]
 public class StaffFlowTests(BrowserFixture f)
 {
-    private const string Password = "Demo123!";
+    private static readonly string Password = Environment.GetEnvironmentVariable("SAT_E2E_PASSWORD") ?? "Demo123!";
+    private static readonly string AdminPhone = Environment.GetEnvironmentVariable("SAT_E2E_ADMIN_PHONE") ?? "+998900000000";
+    private static readonly string AdminPassword = Environment.GetEnvironmentVariable("SAT_E2E_ADMIN_PASSWORD") ?? "Admin123!";
 
     [Fact]
     public async Task Teacher_dashboard_groups_students_and_attendance()
@@ -63,7 +65,7 @@ public class StaffFlowTests(BrowserFixture f)
     {
         if (!f.Available) return;
         var page = await f.NewPageAsync();
-        await page.LoginAsync("+998900000000", "Admin123!", "/admin");
+        await page.LoginAsync(AdminPhone, AdminPassword, "/admin");
         await page.WaitForSelectorAsync("text=Savollar banki");
 
         // new question (SPR, so no rich-text options needed)
@@ -110,7 +112,7 @@ public class StaffFlowTests(BrowserFixture f)
     {
         if (!f.Available) return;
         var page = await f.NewPageAsync();
-        await page.LoginAsync("+998900000000", "Admin123!", "/admin");
+        await page.LoginAsync(AdminPhone, AdminPassword, "/admin");
         foreach (var (path, title) in new[] { ("/admin/questions", "Savollar banki"), ("/admin/tests", "Testlar"), ("/admin/materials", "Materiallar"), ("/admin/students", "O'quvchilar"), ("/admin/users", "Xodimlar"), ("/admin/groups", "Guruhlar"), ("/admin/analytics", "Tahlil"), ("/admin/settings", "Sozlamalar"), ("/admin/audit", "Audit"), ("/teacher/assign", "Test tayinlash") })
         {
             await page.GoAsync(path);

@@ -1,15 +1,19 @@
 # One-shot deployment of the SAT platform to free hosting:
 #   GitHub (code + Docker image in ghcr.io)  ->  Neon (PostgreSQL)  ->  Render (web service, free plan)
 #
-# Needs API keys, passed as environment variables (never stored in the repo):
-#   $env:GITHUB_TOKEN   - github.com -> Settings -> Developer settings -> Personal access tokens (classic), scopes: repo, write:packages
+# Required environment variables (never stored in the repo):
 #   $env:NEON_API_KEY   - console.neon.tech -> Account settings -> API keys
 #   $env:RENDER_API_KEY - dashboard.render.com -> Account settings -> API keys
 # Optional:
+#   $env:GITHUB_TOKEN   - github.com -> Settings -> Developer settings -> Personal access tokens (classic), scopes: repo, write:packages.
+#                         Without it the GitHub repo push is skipped; the image is pushed with the existing `docker login ghcr.io`
+#                         and Render reuses its existing GitHub registry credential.
+#   $env:GITHUB_USER    - GitHub account (default: diyorbekdev02-dev) when GITHUB_TOKEN is not set
 #   $env:TELEGRAM_BOT_TOKEN    - bot token from @BotFather (registration codes + notifications)
 #   $env:TELEGRAM_BOT_USERNAME - bot username without @ (resolved automatically from the token when omitted)
-#   $env:SAT_ADMIN_PASSWORD    - super admin password (+998900000000); random when omitted (see Render logs)
 #   $env:SAT_ADMIN_PHONE       - super admin phone (default +998900000000)
+#   $env:SAT_ADMIN_PASSWORD    - super admin password; random when omitted (see Render logs)
+#   $env:SAT_DEMO_PASSWORD     - password of the demo accounts
 #
 # Usage:  powershell -File deploy\deploy.ps1          (re-runnable; existing resources are reused)
 
@@ -21,47 +25,52 @@ $RepoName = 'sat-platform'
 $ServiceName = 'sat-platform'
 $ImageName = 'sat-platform'
 
-foreach ($v in 'GITHUB_TOKEN', 'NEON_API_KEY', 'RENDER_API_KEY') {
+foreach ($v in 'NEON_API_KEY', 'RENDER_API_KEY') {
     if (-not (Get-Item "env:$v" -ErrorAction SilentlyContinue).Value) { throw "Missing environment variable $v" }
 }
 
 function Step($text) { Write-Host "`n==> $text" -ForegroundColor Cyan }
 
 # ---------------------------------------------------------------- GitHub: repo + push
-Step "GitHub: repository"
-$gh = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json'; 'User-Agent' = 'sat-deploy' }
-$login = (Invoke-RestMethod -Headers $gh 'https://api.github.com/user').login
-Write-Host "account: $login"
-
-try {
-    $repo = Invoke-RestMethod -Headers $gh "https://api.github.com/repos/$login/$RepoName"
-    Write-Host "repo exists: $($repo.html_url)"
-} catch {
-    $repo = Invoke-RestMethod -Headers $gh -Method Post 'https://api.github.com/user/repos' -ContentType 'application/json' `
-        -Body (@{ name = $RepoName; private = $true; description = 'Digital SAT preparation platform (Blazor + PostgreSQL)' } | ConvertTo-Json)
-    Write-Host "repo created: $($repo.html_url)"
+$login = if ($env:GITHUB_USER) { $env:GITHUB_USER } else { 'diyorbekdev02-dev' }
+if ($env:GITHUB_TOKEN) {
+    Step "GitHub: repository"
+    $gh = @{ Authorization = "Bearer $env:GITHUB_TOKEN"; Accept = 'application/vnd.github+json'; 'User-Agent' = 'sat-deploy' }
+    $login = (Invoke-RestMethod -Headers $gh 'https://api.github.com/user').login
+    Write-Host "account: $login"
+    try {
+        $repo = Invoke-RestMethod -Headers $gh "https://api.github.com/repos/$login/$RepoName"
+        Write-Host "repo exists: $($repo.html_url)"
+    } catch {
+        $repo = Invoke-RestMethod -Headers $gh -Method Post 'https://api.github.com/user/repos' -ContentType 'application/json' `
+            -Body (@{ name = $RepoName; private = $true; description = 'Digital SAT preparation platform (Blazor + PostgreSQL)' } | ConvertTo-Json)
+        Write-Host "repo created: $($repo.html_url)"
+    }
+    Step "GitHub: push"
+    Push-Location $Root
+    try {
+        if (-not (Test-Path (Join-Path $Root '.git'))) { git init -b main | Out-Null }
+        if (-not (git remote | Select-String -Quiet '^origin$')) { git remote add origin "https://github.com/$login/$RepoName.git" }
+        else { git remote set-url origin "https://github.com/$login/$RepoName.git" }
+        $basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GITHUB_TOKEN"))
+        git -c "http.extraheader=AUTHORIZATION: basic $basic" push -u origin main
+        if ($LASTEXITCODE -ne 0) { throw "git push failed" }
+    } finally { Pop-Location }
+} else {
+    Write-Host "GITHUB_TOKEN not set: skipping the GitHub repo push (account assumed: $login)" -ForegroundColor Yellow
 }
-
-Step "GitHub: push"
-Push-Location $Root
-try {
-    if (-not (Test-Path (Join-Path $Root '.git'))) { git init -b main | Out-Null }
-    if (-not (git remote | Select-String -Quiet '^origin$')) { git remote add origin "https://github.com/$login/$RepoName.git" }
-    else { git remote set-url origin "https://github.com/$login/$RepoName.git" }
-    $basic = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GITHUB_TOKEN"))
-    git -c "http.extraheader=AUTHORIZATION: basic $basic" push -u origin main
-    if ($LASTEXITCODE -ne 0) { throw "git push failed" }
-} finally { Pop-Location }
 
 # ---------------------------------------------------------------- Docker image -> ghcr.io
 Step "Docker: build + push image"
 $imagePath = "ghcr.io/$($login.ToLower())/$ImageName`:latest"
 docker build -t $imagePath $Root
 if ($LASTEXITCODE -ne 0) { throw "docker build failed" }
-docker login ghcr.io -u $login --password $env:GITHUB_TOKEN
-if ($LASTEXITCODE -ne 0) { throw "docker login failed" }
+if ($env:GITHUB_TOKEN) {
+    docker login ghcr.io -u $login --password $env:GITHUB_TOKEN
+    if ($LASTEXITCODE -ne 0) { throw "docker login failed" }
+}
 docker push $imagePath
-if ($LASTEXITCODE -ne 0) { throw "docker push failed" }
+if ($LASTEXITCODE -ne 0) { throw "docker push failed (run: docker login ghcr.io)" }
 
 # ---------------------------------------------------------------- Neon: PostgreSQL
 Step "Neon: database"
@@ -98,9 +107,15 @@ Write-Host "owner: $($owner.name) ($($owner.id))"
 
 $creds = (Invoke-RestMethod -Headers $render "https://api.render.com/v1/registrycredentials?ownerId=$($owner.id)&limit=50") | ForEach-Object { if ($_.registryCredential) { $_.registryCredential } else { $_ } }
 $cred = $creds | Where-Object { $_.name -eq 'ghcr-sat' } | Select-Object -First 1
-$credBody = @{ registry = 'GITHUB'; username = $login; authToken = $env:GITHUB_TOKEN; name = 'ghcr-sat'; ownerId = $owner.id } | ConvertTo-Json
-if ($cred) { $cred = Invoke-RestMethod -Headers $render -Method Patch "https://api.render.com/v1/registrycredentials/$($cred.id)" -ContentType 'application/json' -Body $credBody }
-else { $cred = Invoke-RestMethod -Headers $render -Method Post 'https://api.render.com/v1/registrycredentials' -ContentType 'application/json' -Body $credBody }
+if ($env:GITHUB_TOKEN) {
+    $credBody = @{ registry = 'GITHUB'; username = $login; authToken = $env:GITHUB_TOKEN; name = 'ghcr-sat'; ownerId = $owner.id } | ConvertTo-Json
+    if ($cred) { $cred = Invoke-RestMethod -Headers $render -Method Patch "https://api.render.com/v1/registrycredentials/$($cred.id)" -ContentType 'application/json' -Body $credBody }
+    else { $cred = Invoke-RestMethod -Headers $render -Method Post 'https://api.render.com/v1/registrycredentials' -ContentType 'application/json' -Body $credBody }
+} elseif (-not $cred) {
+    $cred = $creds | Where-Object { $_.registry -eq 'GITHUB' } | Select-Object -First 1
+    if (-not $cred) { throw "Render has no GitHub registry credential; set GITHUB_TOKEN" }
+    Write-Host "reusing registry credential: $($cred.name)"
+}
 
 $services = (Invoke-RestMethod -Headers $render "https://api.render.com/v1/services?ownerId=$($owner.id)&limit=50") | ForEach-Object { $_.service }
 $service = $services | Where-Object { $_.name -eq $ServiceName } | Select-Object -First 1

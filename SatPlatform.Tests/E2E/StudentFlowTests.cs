@@ -6,7 +6,8 @@ namespace SatPlatform.Tests.E2E;
 [Collection("e2e")]
 public class StudentFlowTests(BrowserFixture f)
 {
-    private const string StudentPhone = "+998902000000", Password = "Demo123!";
+    private const string StudentPhone = "+998902000000";
+    private static readonly string Password = Environment.GetEnvironmentVariable("SAT_E2E_PASSWORD") ?? "Demo123!";
 
     [Fact]
     public async Task Login_wrong_password_shows_error()
