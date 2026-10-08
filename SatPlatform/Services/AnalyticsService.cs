@@ -204,7 +204,7 @@ public class AnalyticsService(IDbContextFactory<AppDbContext> factory, SettingsS
         await using var db = await factory.CreateDbContextAsync();
         var q = db.Questions.AsNoTracking().Where(x => x.AttemptCount >= minAttempts);
         if (section is not null) q = q.Where(x => x.Section == section);
-        var rows = await q.Select(x => new { x.Id, x.Section, Skill = x.Skill.Name, x.Difficulty, x.AttemptCount, x.CorrectCount, x.TotalTimeSeconds, x.Text }).Take(2000).ToListAsync();
+        var rows = await q.Select(x => new { x.Id, x.Section, Skill = x.Skill.Name, x.Difficulty, x.AttemptCount, x.CorrectCount, x.TotalTimeSeconds, x.Text }).OrderByDescending(x => x.AttemptCount).Take(2000).ToListAsync();
         var list = rows.Select(x => new QuestionAnalytics(x.Id, x.Section, x.Skill, x.Difficulty, x.AttemptCount, x.CorrectCount, x.AttemptCount == 0 ? 0 : Math.Round(x.CorrectCount * 100.0 / x.AttemptCount, 1),
             x.AttemptCount == 0 ? 0 : Math.Round((double)x.TotalTimeSeconds / x.AttemptCount), ContentService.Preview(x.Text, 90)));
         return (sort switch { "hardest" => list.OrderBy(x => x.Accuracy), "easiest" => list.OrderByDescending(x => x.Accuracy), "slowest" => list.OrderByDescending(x => x.AvgTime), _ => list.OrderByDescending(x => x.Attempts) }).Take(200).ToList();

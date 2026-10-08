@@ -154,7 +154,7 @@ public class StudentFlowTests(BrowserFixture f)
         await page.LoginAsync(StudentPhone, Password, "/dashboard");
         await page.EnsureNoActiveAttemptAsync();
         await page.GoAsync("/tests");
-        var card = page.Locator(".card", new() { HasText = "SAT Mock Test #1" });
+        var card = page.Locator(".card", new() { HasText = "Diagnostik test" });
         var cont = card.Locator("a:has-text('Davom ettirish')");
         if (await cont.CountAsync() > 0) await cont.First.ClickAsync();
         else { await card.Locator("a:has-text('Testni boshlash')").ClickAsync(); await page.WaitForURLAsync(u => u.Contains("/start"), new() { WaitUntil = WaitUntilState.DOMContentLoaded }); await page.WaitForSelectorAsync("button:has-text('Testni boshlash'):not([disabled])"); await page.ClickAsync("button:has-text('Testni boshlash')"); }

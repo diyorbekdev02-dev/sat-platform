@@ -25,7 +25,7 @@ var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL") is { L
 builder.Services.AddRazorComponents().AddInteractiveServerComponents(o => o.DetailedErrors = builder.Environment.IsDevelopment());
 builder.Services.AddCascadingAuthenticationState();
 
-builder.Services.AddDbContextFactory<AppDbContext>(o => o.UseNpgsql(connectionString, n => n.EnableRetryOnFailure(3)));
+builder.Services.AddDbContextFactory<AppDbContext>(o => o.UseNpgsql(connectionString, n => n.EnableRetryOnFailure(3).UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)));
 builder.Services.AddDataProtection().SetApplicationName("SatPlatform").PersistKeysToDbContext<AppDbContext>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme).AddCookie(o =>

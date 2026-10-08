@@ -306,7 +306,7 @@ public class ContentService(IDbContextFactory<AppDbContext> factory, AuditServic
         var probe = plain.Length > 60 ? plain[..60] : plain;
         await using var db = await factory.CreateDbContextAsync();
         return await db.Questions.AsNoTracking().Where(q => q.Id != excludeId && EF.Functions.ILike(q.Text, $"%{probe}%"))
-            .Take(5).Select(x => new QuestionRow(x.Id, x.Section, x.Domain.Name, x.Skill.Name, x.SkillId, x.Difficulty, x.Type, x.Status, x.Text, x.AttemptCount, x.CorrectCount, x.UpdatedAt, x.Tag)).ToListAsync();
+            .OrderBy(q => q.Id).Take(5).Select(x => new QuestionRow(x.Id, x.Section, x.Domain.Name, x.Skill.Name, x.SkillId, x.Difficulty, x.Type, x.Status, x.Text, x.AttemptCount, x.CorrectCount, x.UpdatedAt, x.Tag)).ToListAsync();
     }
 
     public async Task<Dictionary<string, int>> CountsAsync()

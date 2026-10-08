@@ -285,7 +285,7 @@ public class PracticeService(IDbContextFactory<AppDbContext> factory, Statistics
     {
         await using var db = await factory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
-        var expired = await db.PracticeSessions.Where(s => s.Status == PracticeStatus.InProgress && ((s.DeadlineAt != null && s.DeadlineAt < now) || s.StartedAt < now.AddHours(-24))).Take(100).ToListAsync(ct);
+        var expired = await db.PracticeSessions.Where(s => s.Status == PracticeStatus.InProgress && ((s.DeadlineAt != null && s.DeadlineAt < now) || s.StartedAt < now.AddHours(-24))).OrderBy(s => s.StartedAt).Take(100).ToListAsync(ct);
         foreach (var s in expired)
         {
             try { if (s.DeadlineAt is not null && s.DeadlineAt < now) await FinishInternalAsync(db, s); else { s.Status = PracticeStatus.Abandoned; s.CompletedAt = now; await db.SaveChangesAsync(ct); } }

@@ -59,7 +59,7 @@ public class TestEngineService(IDbContextFactory<AppDbContext> factory, ScoringS
         foreach (var a in assignments)
         {
             var mine = attempts.Where(x => x.AssignmentId == a.Id).ToList();
-            list.Add(new AvailableTest(a.Test, a, mine.Count(x => x.Status is not AttemptStatus.Abandoned), a.AttemptLimit,
+            list.Add(new AvailableTest(a.Test, a, mine.Count, a.AttemptLimit,
                 mine.FirstOrDefault(x => x.Status is AttemptStatus.InProgress or AttemptStatus.Break),
                 mine.FirstOrDefault(x => x.Status is AttemptStatus.Completed), a.EndAt is not null && a.EndAt < now, a.StartAt > now));
         }
@@ -67,7 +67,7 @@ public class TestEngineService(IDbContextFactory<AppDbContext> factory, ScoringS
         {
             if (list.Any(x => x.Test.Id == t.Id)) continue;
             var mine = attempts.Where(x => x.TestId == t.Id && x.AssignmentId == null).ToList();
-            list.Add(new AvailableTest(t, null, mine.Count(x => x.Status is not AttemptStatus.Abandoned), null,
+            list.Add(new AvailableTest(t, null, mine.Count, null,
                 mine.FirstOrDefault(x => x.Status is AttemptStatus.InProgress or AttemptStatus.Break), mine.FirstOrDefault(x => x.Status == AttemptStatus.Completed), false, false));
         }
         return list;
@@ -144,7 +144,7 @@ public class TestEngineService(IDbContextFactory<AppDbContext> factory, ScoringS
                     throw new AppException("Bu test sizning guruhingizga tayinlanmagan.");
                 if (assignment.AttemptLimit is int limit)
                 {
-                    var used = await db.TestAttempts.CountAsync(a => a.StudentId == studentId && a.AssignmentId == assignmentId && a.Status != AttemptStatus.Abandoned);
+                    var used = await db.TestAttempts.CountAsync(a => a.StudentId == studentId && a.AssignmentId == assignmentId);
                     if (used >= limit) throw new AppException("Urinishlar soni tugagan.");
                 }
             }
@@ -472,7 +472,7 @@ public class TestEngineService(IDbContextFactory<AppDbContext> factory, ScoringS
     {
         await using var db = await factory.CreateDbContextAsync();
         var now = DateTime.UtcNow;
-        var ids = await db.TestAttempts.Where(a => (a.Status == AttemptStatus.InProgress || a.Status == AttemptStatus.Break) && a.UpdatedAt < now.AddSeconds(-5)).Select(a => a.Id).Take(200).ToListAsync(ct);
+        var ids = await db.TestAttempts.Where(a => (a.Status == AttemptStatus.InProgress || a.Status == AttemptStatus.Break) && a.UpdatedAt < now.AddSeconds(-5)).OrderBy(a => a.UpdatedAt).Select(a => a.Id).Take(200).ToListAsync(ct);
         foreach (var id in ids)
         {
             try
