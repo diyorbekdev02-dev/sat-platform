@@ -60,6 +60,8 @@ E2E testlar `http://localhost:5100` da ishlab turgan saytni talab qiladi (`SAT_E
 
 ## Deploy (Render + Neon, bepul)
 
+Jonli sayt: https://sat-platform-9jc4.onrender.com (Render `sat-platform`, Neon `sat-platform`). GITHUB_TOKEN ixtiyoriy: usiz GitHub push o'tkazib yuboriladi, image mavjud `docker login ghcr.io` bilan yuklanadi.
+
 Chat loyihasidagi kabi: `deploy\deploy.ps1` GitHub repo yaratadi va push qiladi, Docker image'ni ghcr.io ga yuklaydi, Neon'da baza ochadi,
 Render'da web service yaratadi/yangilaydi.
 
@@ -67,7 +69,7 @@ Render'da web service yaratadi/yangilaydi.
 $env:GITHUB_TOKEN = "ghp_..."          # repo, write:packages
 $env:NEON_API_KEY = "..."
 $env:RENDER_API_KEY = "rnd_..."
-$env:TELEGRAM_BOT_TOKEN = "123456:ABC..."   # @BotFather dan yangi bot (chat botidan alohida!)
+$env:TELEGRAM_BOT_TOKEN = "123456:ABC..."   # @BotFather dan bot; jonli saytda @this_is_Personalbot ishlatiladi (chat botidan alohida!)
 $env:SAT_ADMIN_PASSWORD = "kuchli-parol"    # +998900000000 super admin
 $env:SAT_DEMO_PASSWORD = "Demo123!"         # demo hisoblar (ixtiyoriy)
 powershell -File deploy\deploy.ps1
