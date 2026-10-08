@@ -71,6 +71,7 @@ public class StudentFlowTests(BrowserFixture f)
 
         for (var i = 0; i < 5; i++)
         {
+            await page.WaitForSelectorAsync($".q-number .n:has-text('{i + 1}')");
             await page.WaitForSelectorAsync(".q-content");
             var option = await page.QuerySelectorAsync(".option");
             if (option is not null)
@@ -85,7 +86,7 @@ public class StudentFlowTests(BrowserFixture f)
                 await page.ClickAsync("button:has-text('Javobni tasdiqlash')");
             }
             await page.WaitForSelectorAsync(".feedback");
-            if (i < 4) await page.ClickAsync("button:has-text('Keyingi')");
+            if (i < 4) { await page.ClickAsync("button:has-text('Keyingi')"); await page.WaitForSelectorAsync($".q-number .n:has-text('{i + 2}')"); }
         }
         await page.ClickAsync("footer button:has-text('Yakunlash')");
         await page.WaitForURLAsync(u => u.EndsWith("/result"));
@@ -126,6 +127,7 @@ public class StudentFlowTests(BrowserFixture f)
                 if (option is not null) await option.ClickAsync();
                 else { await page.FillAsync(".spr input", "1"); await page.Keyboard.PressAsync("Tab"); }
                 await page.ClickAsync("footer button:has-text('Next'), footer button:has-text('Review')");
+                await page.WaitForSelectorAsync($".q-number .n:has-text('{i + 2}')");
             }
             // flag + grid work
             await page.ClickAsync(".flag-btn");

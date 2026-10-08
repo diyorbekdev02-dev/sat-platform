@@ -187,7 +187,6 @@ else if (state.CurrentModule is not null)
     private bool staff;
     private readonly string circuitId = Guid.NewGuid().ToString("N");
     private DotNetObjectReference<Attempt>? self;
-    private System.Threading.Timer? heartbeat;
     private DateTime questionShownAt = DateTime.UtcNow;
     private int lastTimerModule = -1;
     private bool timerStarted;
@@ -225,7 +224,7 @@ else if (state.CurrentModule is not null)
             self = DotNetObjectReference.Create(this);
             await JS.InvokeVoidAsync("sat.setKeyHandler", self);
             await JS.InvokeVoidAsync("sat.setLeaveGuard", true);
-            heartbeat = new System.Threading.Timer(_ => Engine.Heartbeat(AttemptId, circuitId), null, 5000, 5000);
+            await JS.InvokeVoidAsync("sat.startHeartbeat", self);
         }
         if (state is null || lockedOut) return;
         if (state.Attempt.Status == AttemptStatus.Break)
@@ -242,6 +241,9 @@ else if (state.CurrentModule is not null)
             try { await JS.InvokeVoidAsync("sat.renderMath", "passage-content"); await JS.InvokeVoidAsync("sat.renderMath", "ref-sheet"); } catch { }
         }
     }
+
+    [JSInvokable]
+    public void OnHeartbeat() => Engine.Heartbeat(AttemptId, circuitId);
 
     [JSInvokable]
     public async Task OnTimerExpired()
@@ -424,9 +426,8 @@ else if (state.CurrentModule is not null)
 
     public async ValueTask DisposeAsync()
     {
-        heartbeat?.Dispose();
         Engine.ReleaseSession(AttemptId, circuitId);
-        try { await JS.InvokeVoidAsync("sat.setKeyHandler", null); await JS.InvokeVoidAsync("sat.setLeaveGuard", false); await JS.InvokeVoidAsync("sat.stopTimer", "timer"); if (lineReader) await JS.InvokeVoidAsync("sat.toggleLineReader"); } catch { }
+        try { await JS.InvokeVoidAsync("sat.stopHeartbeat"); await JS.InvokeVoidAsync("sat.setKeyHandler", null); await JS.InvokeVoidAsync("sat.setLeaveGuard", false); await JS.InvokeVoidAsync("sat.stopTimer", "timer"); if (lineReader) await JS.InvokeVoidAsync("sat.toggleLineReader"); } catch { }
         self?.Dispose();
     }
 }

@@ -77,6 +77,7 @@ public static class PageExt
             await cont.First.ClickAsync();
             await page.WaitForURLAsync(u => u.Contains("/attempt/"), new() { WaitUntil = WaitUntilState.DOMContentLoaded });
             await page.WaitForSelectorAsync(".test-header, .break-screen, .center-box");
+            for (var w = 0; w < 8 && await page.Locator("button:has-text('Qayta tekshirish')").CountAsync() > 0; w++) { await page.WaitForTimeoutAsync(5000); await page.ClickAsync("button:has-text('Qayta tekshirish')"); await page.WaitForTimeoutAsync(800); }
             if (await page.Locator(".test-header button:has-text('Tools')").CountAsync() > 0)
             {
                 await page.ClickAsync(".test-header button:has-text('Tools')");

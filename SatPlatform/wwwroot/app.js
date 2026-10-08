@@ -128,7 +128,11 @@ window.sat = (() => {
     function scrollTop(id) { const el = id ? document.getElementById(id) : window; if (el) el.scrollTo({ top: 0 }); }
     function confirm(msg) { return window.confirm(msg); }
     function print() { window.print(); }
+    // heartbeat driven by the browser: stops as soon as the tab is gone, so another window can take over the test
+    let hb = null;
+    function startHeartbeat(ref) { stopHeartbeat(); hb = setInterval(() => { try { ref.invokeMethodAsync("OnHeartbeat"); } catch { } }, 5000); }
+    function stopHeartbeat() { if (hb) { clearInterval(hb); hb = null; } }
     function ready() { document.documentElement.setAttribute("data-ready", "1"); }
 
-    return { ready, theme, renderMath, startTimer, stopTimer, backup, deviceCheck, setLeaveGuard, setKeyHandler, toggleLineReader, highlightSelection, clearHighlights, initEditor, destroyEditor, insertTable, download, copy, focus, scrollTop, confirm, print };
+    return { ready, startHeartbeat, stopHeartbeat, theme, renderMath, startTimer, stopTimer, backup, deviceCheck, setLeaveGuard, setKeyHandler, toggleLineReader, highlightSelection, clearHighlights, initEditor, destroyEditor, insertTable, download, copy, focus, scrollTop, confirm, print };
 })();
