@@ -39,7 +39,7 @@ else
                         {
                             <div class="option-edit">
                                 <div class="key">@o.Key</div>
-                                <RichEditor @bind-Value="o.Text" Placeholder="@($"Variant {o.Key}")" />
+                                <div><RichEditor @bind-Value="o.Text" Placeholder="@($"Variant {o.Key}")" Compact="true" /></div>
                                 <label class="correct-pick"><input type="radio" name="correct" checked="@o.IsCorrect" @onchange="() => SetCorrect(o.Key)" /> to'g'ri</label>
                             </div>
                         }

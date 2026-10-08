@@ -389,3 +389,5 @@ select.input { appearance: auto; }
 
 #blazor-error-ui { display: none; position: fixed; bottom: 0; left: 0; right: 0; background: #fde68a; color: #1f2937; padding: 12px 20px; z-index: 1000; font-size: 14px; box-shadow: 0 -2px 8px rgba(0,0,0,.2); }
 #blazor-error-ui .reload { margin-left: 10px; font-weight: 700; } #blazor-error-ui .dismiss { float: right; cursor: pointer; }
+.editor.compact .ql-container { min-height: 48px; } .editor.compact .ql-editor { min-height: 48px; padding: 8px 10px; } .editor.compact .ql-toolbar { padding: 3px 6px; }
+.editor.compact .ql-toolbar .ql-formats { margin-right: 6px; }

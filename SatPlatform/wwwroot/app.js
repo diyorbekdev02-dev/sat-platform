@@ -101,7 +101,7 @@ window.sat = (() => {
         if (editors[id]) { editors[id].root.innerHTML = html || ""; return; }
         const q = new Quill(el, {
             theme: "snow", placeholder: placeholder || "",
-            modules: { toolbar: { container: [["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], [{ script: "sub" }, { script: "super" }], ["link", "image", "formula"], ["clean"]],
+            modules: { toolbar: { container: el.closest(".compact") ? [["bold", "italic", "underline"], [{ script: "sub" }, { script: "super" }], ["image", "formula"]] : [["bold", "italic", "underline"], [{ list: "ordered" }, { list: "bullet" }], [{ script: "sub" }, { script: "super" }], ["link", "image", "formula"], ["clean"]],
                 handlers: { image: () => { const input = document.createElement("input"); input.type = "file"; input.accept = "image/*"; input.onchange = async () => { const f = input.files[0]; if (!f) return; const url = await uploadImage(f); if (url) { const r = q.getSelection(true); q.insertEmbed(r ? r.index : 0, "image", url, "user"); } }; input.click(); } } } }
         });
         q.root.innerHTML = html || "";
