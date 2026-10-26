@@ -69,7 +69,7 @@ Render'da web service yaratadi/yangilaydi.
 $env:GITHUB_TOKEN = "ghp_..."          # repo, write:packages
 $env:NEON_API_KEY = "..."
 $env:RENDER_API_KEY = "rnd_..."
-$env:TELEGRAM_BOT_TOKEN = "123456:ABC..."   # @BotFather dan bot; jonli saytda @this_is_Personalbot ishlatiladi (chat botidan alohida!)
+$env:TELEGRAM_BOT_TOKEN = "123456:ABC..."   # @BotFather dan bot; jonli saytda @sat_notificationbot ishlatiladi (chat botidan alohida!)
 $env:SAT_ADMIN_PASSWORD = "kuchli-parol"    # +998900000000 super admin
 $env:SAT_DEMO_PASSWORD = "Demo123!"         # demo hisoblar (ixtiyoriy)
 powershell -File deploy\deploy.ps1
