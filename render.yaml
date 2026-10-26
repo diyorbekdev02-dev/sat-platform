@@ -20,6 +20,8 @@ services:
         sync: false
       - key: App__PublicUrl
         value: https://sat-platform.onrender.com
+      - key: App__KeepAliveHours
+        value: "07-23"
       - key: App__KeepAlive
         value: "true"
       - key: ASPNETCORE_ENVIRONMENT

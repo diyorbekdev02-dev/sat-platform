@@ -14,6 +14,7 @@
 #   $env:SAT_ADMIN_PHONE       - super admin phone (default +998900000000)
 #   $env:SAT_ADMIN_PASSWORD    - super admin password; random when omitted (see Render logs)
 #   $env:SAT_DEMO_PASSWORD     - password of the demo accounts
+#   $env:SAT_KEEPALIVE_HOURS   - daily keep-alive window, Asia/Tashkent (default 07-23; Render free tier = 750 h/month per workspace)
 #
 # Usage:  powershell -File deploy\deploy.ps1          (re-runnable; existing resources are reused)
 
@@ -123,6 +124,7 @@ $service = $services | Where-Object { $_.name -eq $ServiceName } | Select-Object
 $envVars = @(
     @{ key = 'DATABASE_URL'; value = $uri },
     @{ key = 'App__KeepAlive'; value = 'true' },
+    @{ key = 'App__KeepAliveHours'; value = $(if ($env:SAT_KEEPALIVE_HOURS) { $env:SAT_KEEPALIVE_HOURS } else { '07-23' }) },
     @{ key = 'ASPNETCORE_ENVIRONMENT'; value = 'Production' },
     @{ key = 'Seed__AdminPhone'; value = $(if ($env:SAT_ADMIN_PHONE) { $env:SAT_ADMIN_PHONE } else { '+998900000000' }) }
 )

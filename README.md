@@ -76,7 +76,10 @@ powershell -File deploy\deploy.ps1
 ```
 
 Muhit o'zgaruvchilari: `DATABASE_URL`, `Telegram__BotToken`, `Telegram__BotUsername`, `Seed__AdminPhone`, `Seed__AdminPassword`,
-`Seed__DemoPassword`, `Seed__Demo` (false = demo kontent yaratilmaydi), `App__PublicUrl`, `App__KeepAlive`, `App__CenterName`.
+`Seed__DemoPassword`, `Seed__Demo` (false = demo kontent yaratilmaydi), `App__PublicUrl`, `App__KeepAlive`, `App__KeepAliveHours`, `App__CenterName`.
+
+Render bepul plani workspace uchun oyiga 750 soat beradi (barcha bepul servislar birgalikda). `App__KeepAlive=true` saytni uxlatmaydi,
+`App__KeepAliveHours=07-23` (Toshkent vaqti) esa uni faqat shu oraliqda uyg'oq tutadi — oyiga ~480 soat. Kechasi birinchi so'rov 30-60 soniya kechikishi mumkin.
 Fayllar (rasm, materiallar) va Data Protection kalitlari bazada saqlanadi — diskka bog'liq emas.
 
 ## Tuzilishi

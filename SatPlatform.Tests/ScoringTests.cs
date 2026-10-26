@@ -143,3 +143,43 @@ public class AuthHelperTests
         Assert.Null(AnalyticsService.TargetProgress(null, 1400));
     }
 }
+
+public class KeepAliveScheduleTests
+{
+    private static DateTime TashkentUtc(int hour, int minute = 0) => Tz.ToUtc(new DateTime(2026, 10, 26, hour, minute, 0));
+
+    [Theory]
+    [InlineData(null, 0, 24)]
+    [InlineData("", 0, 24)]
+    [InlineData("07-23", 7, 23)]
+    [InlineData(" 8 - 22 ", 8, 22)]
+    [InlineData("22-06", 22, 6)]
+    [InlineData("garbage", 0, 24)]
+    [InlineData("7-7", 0, 24)]
+    [InlineData("-1-30", 0, 24)]
+    public void Parse(string? text, int start, int end) => Assert.Equal(new KeepAliveSchedule(start, end), KeepAliveSchedule.Parse(text));
+
+    [Theory]
+    [InlineData("07-23", 6, 59, false)]
+    [InlineData("07-23", 7, 0, true)]
+    [InlineData("07-23", 15, 0, true)]
+    [InlineData("07-23", 22, 59, true)]
+    [InlineData("07-23", 23, 0, false)]
+    [InlineData("07-23", 2, 0, false)]
+    [InlineData("22-06", 23, 0, true)]
+    [InlineData("22-06", 3, 0, true)]
+    [InlineData("22-06", 6, 0, false)]
+    [InlineData("22-06", 12, 0, false)]
+    [InlineData("0-24", 12, 0, true)]
+    public void Is_active_in_tashkent_local_time(string text, int hour, int minute, bool active)
+        => Assert.Equal(active, KeepAliveSchedule.Parse(text).IsActive(TashkentUtc(hour, minute)));
+
+    [Fact]
+    public void Wait_until_next_start()
+    {
+        var s = KeepAliveSchedule.Parse("07-23");
+        Assert.Equal(TimeSpan.FromHours(4), s.UntilNextStart(TashkentUtc(3)));
+        Assert.Equal(TimeSpan.FromHours(8), s.UntilNextStart(TashkentUtc(23)));
+        Assert.Equal(TimeSpan.FromDays(1), s.UntilNextStart(TashkentUtc(7)));
+    }
+}
