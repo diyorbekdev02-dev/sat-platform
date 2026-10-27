@@ -393,3 +393,22 @@ select.input { appearance: auto; }
 .editor.compact .ql-toolbar .ql-formats { margin-right: 6px; }
 .phone-link { color: inherit; text-decoration: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .phone-link:hover { color: var(--link); text-decoration: underline; }
+
+/* per-page guide drawer (top bar «Qo'llanma») */
+.help-btn { gap: 6px; }
+.help-backdrop { position: fixed; inset: 0; background: rgba(10, 15, 30, .45); z-index: 90; animation: help-fade .15s ease-out; }
+.help-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(500px, 100vw); background: var(--bg); z-index: 91; display: flex; flex-direction: column; box-shadow: var(--shadow-float); outline: none; animation: help-slide .2s ease-out; }
+.help-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 12px 12px 22px; border-bottom: 1px solid var(--border); }
+.help-head h2 { font-size: 20px; margin: 2px 0 0; }
+.help-kicker { font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--link); }
+.help-body { flex: 1; overflow-y: auto; padding: 16px 22px 24px; }
+.help-intro { margin: 0 0 14px; color: var(--muted); font-size: 15px; line-height: 1.55; }
+.help-section { margin-bottom: 16px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-2); }
+.help-section h3 { font-size: 14px; margin: 0 0 8px; }
+.help-section ul { margin: 0; padding-left: 18px; }
+.help-section li { margin-bottom: 6px; font-size: 14px; line-height: 1.5; }
+.help-section code { font-family: Consolas, monospace; font-size: 12.5px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
+.help-foot { display: flex; justify-content: space-between; gap: 8px; padding: 12px 22px; border-top: 1px solid var(--border); }
+@keyframes help-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes help-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (max-width: 760px) { .help-btn span { display: none; } .help-btn { padding: 0 10px; } }

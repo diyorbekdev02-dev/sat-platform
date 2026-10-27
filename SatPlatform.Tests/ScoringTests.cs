@@ -218,3 +218,39 @@ public class PhoneFormatTests
         Assert.False(PhoneFormat.Matches("+998901234567", ""));
     }
 }
+
+public class PageHelpTests
+{
+    // pages that deliberately have no «Qo'llanma» button: public, error, the manual itself, and the exam window
+    private static readonly string[] NoHelp = ["/", "/Error", "/login", "/register", "/forbidden", "/not-found", "/help", "/attempt/{id}"];
+
+    [Theory]
+    [InlineData("/teacher/groups/12", "/teacher/groups/{id}")]
+    [InlineData("/dashboard?x=1", "/dashboard")]
+    [InlineData("/admin/questions/new", "/admin/questions/{id}")]
+    [InlineData("/admin/questions/345", "/admin/questions/{id}")]
+    [InlineData("/practice/new", "/practice/new")]
+    [InlineData("/attempt/7/result", "/attempt/{id}/result")]
+    public void Route_key(string path, string key) => Assert.Equal(key, PageHelp.Key(path));
+
+    [Fact]
+    public void Every_routable_page_has_a_help_topic()
+    {
+        var pages = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "SatPlatform", "Components", "Pages"));
+        var routes = Directory.EnumerateFiles(pages, "*.razor", SearchOption.AllDirectories)
+            .SelectMany(f => System.Text.RegularExpressions.Regex.Matches(File.ReadAllText(f), "^@page \"([^\"]+)\"", System.Text.RegularExpressions.RegexOptions.Multiline).Select(m => m.Groups[1].Value))
+            .Select(r => System.Text.RegularExpressions.Regex.Replace(r, @"\{[A-Za-z]+(:int)?\}", "{id}"))
+            .Distinct().ToList();
+        Assert.True(routes.Count > 30);
+        var missing = routes.Where(r => !NoHelp.Contains(r) && PageHelp.Find(r.Replace("{id}", "1")) is null).ToList();
+        Assert.Empty(missing);
+    }
+
+    [Fact]
+    public void Help_text_is_complete()
+    {
+        var t = PageHelp.Find("/admin/tests/5")!;
+        Assert.NotEmpty(t.Intro);
+        Assert.All(t.Sections, s => { Assert.NotEmpty(s.Heading); Assert.NotEmpty(s.Items); });
+    }
+}
