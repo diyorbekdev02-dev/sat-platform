@@ -1,0 +1,24 @@
+#cloud-config
+# First boot of the SAT Platform VM (Ubuntu 24.04 on Oracle Cloud): Docker, firewall, swap.
+package_update: true
+packages:
+  - ca-certificates
+  - curl
+  - docker.io
+  - docker-compose-v2
+runcmd:
+  - systemctl enable --now docker
+  - usermod -aG docker ubuntu
+  # Oracle Ubuntu images ship iptables rules that drop everything except SSH; open HTTP/HTTPS.
+  - iptables -I INPUT 5 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+  - iptables -I INPUT 5 -m state --state NEW -p tcp --dport 443 -j ACCEPT
+  - netfilter-persistent save || true
+  # Swap helps the 1 GB E2.1.Micro fallback and the first image build on A1.
+  - fallocate -l 2G /swapfile
+  - chmod 600 /swapfile
+  - mkswap /swapfile
+  - swapon /swapfile
+  - echo '/swapfile none swap sw 0 0' >> /etc/fstab
+  - sysctl -w vm.swappiness=10
+  - mkdir -p /opt/sat
+  - chown ubuntu:ubuntu /opt/sat

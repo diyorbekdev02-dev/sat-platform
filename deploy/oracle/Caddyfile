@@ -1,0 +1,5 @@
+# SITE_ADDRESS comes from .env, e.g. 130-61-1-2.sslip.io or sat.example.com. Caddy obtains and renews the TLS certificate.
+{$SITE_ADDRESS} {
+    encode gzip
+    reverse_proxy app:8080
+}

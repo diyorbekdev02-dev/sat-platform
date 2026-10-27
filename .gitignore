@@ -6,3 +6,9 @@ appsettings.Local.json
 deploy/last-url.txt
 TestResults/
 .run/
+deploy/oracle.env
+deploy/oracle_ssh_key
+deploy/oracle_ssh_key.pub
+deploy/oracle_known_hosts
+deploy/last-oracle-url.txt
+deploy/secrets.local.ps1

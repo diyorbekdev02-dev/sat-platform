@@ -1,0 +1,67 @@
+# SAT Platform on a single VM: PostgreSQL + app + Caddy (automatic HTTPS). Values come from .env (written by deploy-oracle.ps1).
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: satplatform-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: satplatform
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sat -d satplatform"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app:
+    image: satplatform:deploy
+    build:
+      context: ./src
+    container_name: satplatform-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      DATABASE_URL: postgres://sat:${POSTGRES_PASSWORD}@postgres:5432/satplatform?sslmode=disable
+      App__PublicUrl: https://${SITE_ADDRESS}
+      App__KeepAlive: "false"
+      App__CenterName: ${CENTER_NAME:-SAT Center}
+      Telegram__BotToken: ${TELEGRAM_BOT_TOKEN}
+      Telegram__BotUsername: ${TELEGRAM_BOT_USERNAME}
+      Seed__AdminPhone: ${ADMIN_PHONE}
+      Seed__AdminPassword: ${ADMIN_PASSWORD}
+      Seed__DemoPassword: ${DEMO_PASSWORD}
+      Seed__Demo: ${SEED_DEMO:-false}
+      TZ: Asia/Tashkent
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/healthz || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: satplatform-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
