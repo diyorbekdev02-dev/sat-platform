@@ -60,7 +60,7 @@ E2E testlar `http://localhost:5100` da ishlab turgan saytni talab qiladi (`SAT_E
 
 ## Deploy (Render + Neon, bepul)
 
-Jonli sayt: https://sat-platform-9jc4.onrender.com (Render `sat-platform`, Neon `sat-platform`). GITHUB_TOKEN ixtiyoriy: usiz GitHub push o'tkazib yuboriladi, image mavjud `docker login ghcr.io` bilan yuklanadi.
+Jonli sayt: https://sat-platform-o9li.onrender.com (Render `sat-platform`, Neon `sat-platform`). Docker image ghcr.io da ommaviy (public), shuning uchun Render uni token siz yuklaydi.
 
 Chat loyihasidagi kabi: `deploy\deploy.ps1` GitHub repo yaratadi va push qiladi, Docker image'ni ghcr.io ga yuklaydi, Neon'da baza ochadi,
 Render'da web service yaratadi/yangilaydi.
