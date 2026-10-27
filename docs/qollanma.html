@@ -37,13 +37,13 @@
   <div class="big">SAT Platform</div>
   <div class="sub">Digital SAT tayyorlov platformasi — foydalanuvchi qo'llanmasi</div>
   <div class="meta">
-    O'quvchi · O'qituvchi · Administrator · Ota-ona<br>
+    <span id="roles">O'quvchi · O'qituvchi · Administrator · Ota-ona</span><br>
     Versiya 1.0 · Oktabr 2026<br>
     Sayt: <b>https://sat-platform-o9li.onrender.com</b> · Telegram bot: <b>@sat_notificationbot</b>
   </div>
 </div>
 
-<h2>Mundarija</h2>
+<h2 id="toc-title">Mundarija</h2>
 <ol class="toc">
   <li>Platforma nima va qanday ishlaydi</li>
   <li>Kirish va ro'yxatdan o'tish (sayt va Telegram bot)</li>
@@ -99,7 +99,7 @@
 </ol>
 <div class="warn">O'qituvchi, assistent va admin hisoblarini faqat administrator yaratadi (Xodimlar va ota-onalar bo'limi). Mustaqil ro'yxatdan o'tishni admin Sozlamalarda o'chirib qo'yishi mumkin.</div>
 
-<h2 class="page">3. O'quvchi uchun</h2>
+<h2 class="page" data-for="student">3. O'quvchi uchun</h2>
 <h3>3.1. Bosh sahifa</h3>
 <div class="shot"><img src="img/dashboard.png" alt="O'quvchi bosh sahifasi"><div class="cap">Bosh sahifa: joriy ball, maqsad, o'zgarish, streak, tavsiya qilingan mashq, zaif skilllar, oxirgi testlar.</div></div>
 <ul>
@@ -163,7 +163,7 @@
   <li><b>Bildirishnomalar</b> (qo'ng'iroq belgisi) — natijalar, tayinlangan testlar, uy vazifalari, davomat.</li>
 </ul>
 
-<h2 class="page">4. O'qituvchi va assistent uchun</h2>
+<h2 class="page" data-for="teacher">4. O'qituvchi va assistent uchun</h2>
 <div class="shot"><img src="img/teacher.png" alt="O'qituvchi paneli"><div class="cap">O'qituvchi paneli: guruhlar, bugungi darslar, e'tibor talab qiladigan o'quvchilar, so'nggi natijalar.</div></div>
 <h3>4.1. Guruhlar va o'quvchilar</h3>
 <p>«Guruhlar» — sizga biriktirilgan guruhlar: o'rtacha ball, aniqlik, davomat. Guruh ichida yorliqlar: O'quvchilar (ball, maqsad, aniqlik, davomat, eng zaif skill), Progress (guruhning zaif skilllari, reyting), Davomat (30 kunlik jadval), Testlar, Uy vazifalari. «O'quvchilar» bo'limida qidirish va tartiblash (ism, ball, eng zaif, faollik). O'quvchini ochsangiz to'liq progress paneli (tahlil, skilllar, testlar, xatolar, vaqt, davomat, uy vazifasi) ko'rinadi.</p>
@@ -187,7 +187,7 @@
 <h3>4.5. Tahlil</h3>
 <p>«Tahlil» — guruh/bo'lim filtri bilan skilllar bo'yicha aniqlik, guruhlar jadvali va o'quvchilar ro'yxati (eng zaiflar yuqorida).</p>
 
-<h2 class="page">5. Administrator uchun</h2>
+<h2 class="page" data-for="admin">5. Administrator uchun</h2>
 <div class="shot"><img src="img/admin.png" alt="Admin paneli"><div class="cap">Admin paneli: markaz statistikasi, guruhlar, zaif skilllar, bank qamrovi, so'nggi faollik.</div></div>
 <h3>5.1. Savollar banki</h3>
 <div class="shot"><img src="img/question-edit.png" alt="Savol tahrirlash"><div class="cap">Savol tahrirlash: bo'lim, domain, skill, qiyinlik, tur; passage, savol matni, variantlar, izoh, video.</div></div>
@@ -227,7 +227,7 @@
 <h3>5.5. Audit jurnali</h3>
 <p>Kim, qachon, nima qilgani: savol/test yaratish va o'zgartirish, chop etish, tayinlash, o'quvchi va guruh o'zgarishlari, davomat, ballarni qayta hisoblash, sozlamalar.</p>
 
-<h2 class="page">6. Ota-ona uchun</h2>
+<h2 class="page" data-for="parent">6. Ota-ona uchun</h2>
 <p>Kirgach «Farzandim» sahifasi: joriy ball, maqsad, aniqlik, davomat, ball dinamikasi, zaif skilllar. Yorliqlar: Skilllar, Testlar (natijalar va javoblar), Xatolar, Vaqt, Davomat, Uy vazifasi. Bir nechta farzand bo'lsa yuqorida tanlash tugmalari. Yana bir farzandni Profil → «Farzandni bog'lash» orqali kod bilan qo'shish mumkin.</p>
 <p>Telegram'ga keladi: farzand darsga kelmasa yoki kechiksa, test natijasi chiqsa.</p>
 
@@ -255,7 +255,7 @@
   <tr><td>Mobil telefonda ishlaydimi?</td><td>Bosh sahifa, mashq, tahlil, materiallar — ha. To'liq test desktop/planshet uchun mo'ljallangan (katta ekran tavsiya etiladi).</td></tr>
 </table>
 
-<h2>9. Demo hisoblar</h2>
+<h2 data-for="admin">9. Demo hisoblar</h2>
 <p>Platformani sinab ko'rish uchun (parol: <code>demo123</code>). Haqiqiy ishga tushirishdan oldin bu hisoblarni o'chirib yoki parollarini o'zgartirib qo'ying.</p>
 <table>
   <tr><th>Rol</th><th>Telefon</th></tr>
