@@ -136,3 +136,23 @@ window.sat = (() => {
 
     return { ready, startHeartbeat, stopHeartbeat, theme, renderMath, startTimer, stopTimer, backup, deviceCheck, setLeaveGuard, setKeyHandler, toggleLineReader, highlightSelection, clearHighlights, initEditor, destroyEditor, insertTable, download, copy, focus, scrollTop, confirm, print };
 })();
+
+// Uzbek phone mask for every <input data-phone>: always "+998 90 123 45 67", digits only, at most 9 after +998.
+// Capture phase on document, so Blazor (@bind oninput/onchange) already reads the formatted value.
+document.addEventListener("input", function (e) {
+    const el = e.target;
+    if (!(el instanceof HTMLInputElement) || !el.hasAttribute("data-phone")) return;
+    const v = el.value;
+    let d;
+    if (v.startsWith("+998")) d = v.slice(4).replace(/\D/g, "");
+    else if ("+998 ".startsWith(v)) d = "";                      // the prefix itself is being erased
+    else {                                                       // pasted "90 123 45 67", "0901234567" or "998901234567"
+        d = v.replace(/\D/g, "");
+        if (d.length > 9 && d.startsWith("998")) d = d.slice(3);
+        else if (d.length > 9 && d.startsWith("0")) d = d.slice(1);
+    }
+    d = d.slice(0, 9);
+    const parts = [d.slice(0, 2), d.slice(2, 5), d.slice(5, 7), d.slice(7, 9)].filter(Boolean);
+    const out = "+998 " + parts.join(" ");
+    if (el.value !== out) el.value = out;
+}, true);

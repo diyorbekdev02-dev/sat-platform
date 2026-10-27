@@ -19,12 +19,12 @@ else
         <thead><tr><th>Ism</th><th>Telefon</th><th>Rol</th><th>Guruhlar</th><th>Telegram</th><th>Holat</th><th>Oxirgi kirish</th><th></th></tr></thead>
         <tbody>@foreach (var u in users)
         {
-            <tr><td class="bold">@u.FullName<div class="tiny muted">@u.Email</div></td><td>@u.Phone</td><td><span class="badge">@Labels.Role(u.Role)</span>@if (u.CanManageQuestions) { <span class="badge accent">savollar</span> }</td><td>@u.GroupCount</td><td>@(u.Telegram ? "✓" : "—")</td><td><span class="badge @(u.IsActive ? "ok" : "danger")">@(u.IsActive ? "Faol" : "O'chirilgan")</span></td><td>@Tz.Fmt(u.LastSeenAt)</td><td><button class="btn sm" @onclick="() => Open(u)"><Icon Name="pencil" Size="14" /></button></td></tr>
+            <tr><td class="bold">@u.FullName<div class="tiny muted">@u.Email</div></td><td><PhoneLink Value="@u.Phone" /></td><td><span class="badge">@Labels.Role(u.Role)</span>@if (u.CanManageQuestions) { <span class="badge accent">savollar</span> }</td><td>@u.GroupCount</td><td>@(u.Telegram ? "✓" : "—")</td><td><span class="badge @(u.IsActive ? "ok" : "danger")">@(u.IsActive ? "Faol" : "O'chirilgan")</span></td><td>@Tz.Fmt(u.LastSeenAt)</td><td><button class="btn sm" @onclick="() => Open(u)"><Icon Name="pencil" Size="14" /></button></td></tr>
         }</tbody></table></div>@if (users.Count == 0) { <div class="empty"><h3>Topilmadi</h3></div> }</div>
 
     <Modal Open="editOpen" OpenChanged="v => editOpen = v" Title="@(editId == 0 ? "Yangi foydalanuvchi" : "Foydalanuvchini tahrirlash")">
         <label class="lbl">Ism-familiya</label><input class="input" @bind="eName" />
-        <label class="lbl">Telefon</label><input class="input" @bind="ePhone" />
+        <label class="lbl">Telefon</label><input class="input" type="tel" inputmode="tel" maxlength="17" data-phone placeholder="+998 90 123 45 67" @bind="ePhone" />
         <label class="lbl">Email</label><input class="input" @bind="eEmail" />
         <label class="lbl">Rol</label>
         <select class="input" @bind="eRole">@foreach (var r in new[] { UserRole.Teacher, UserRole.Assistant, UserRole.Parent, UserRole.Admin, UserRole.SuperAdmin }) { <option value="@r">@Labels.Role(r)</option> }</select>
@@ -52,7 +52,7 @@ else
     {
         Error = null; editOpen = true;
         if (u is null) { editId = 0; eName = ""; ePhone = "+998 "; eEmail = ""; ePassword = ""; eRole = UserRole.Teacher; eCanManage = false; eActive = true; }
-        else { editId = u.Id; eName = u.FullName; ePhone = u.Phone; eEmail = u.Email ?? ""; ePassword = ""; eRole = u.Role; eCanManage = u.CanManageQuestions; eActive = u.IsActive; }
+        else { editId = u.Id; eName = u.FullName; ePhone = PhoneFormat.Display(u.Phone); eEmail = u.Email ?? ""; ePassword = ""; eRole = u.Role; eCanManage = u.CanManageQuestions; eActive = u.IsActive; }
     }
 
     private async Task SaveAsync()

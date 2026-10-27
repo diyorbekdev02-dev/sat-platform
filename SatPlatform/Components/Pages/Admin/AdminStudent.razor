@@ -12,9 +12,9 @@ else
     <div class="grid" style="grid-template-columns: 360px 1fr">
         <div class="stack">
             <div class="card">
-                <div class="row mb"><div class="avatar lg" style="background:@s.User.AvatarColor">@s.User.FullName[0]</div><div><h2>@s.User.FullName</h2><div class="muted small">@s.User.Phone · @(s.User.TelegramChatId is null ? "Telegram ulanmagan" : "Telegram ✓")</div></div></div>
+                <div class="row mb"><div class="avatar lg" style="background:@s.User.AvatarColor">@s.User.FullName[0]</div><div><h2>@s.User.FullName</h2><div class="muted small"><PhoneLink Value="@s.User.Phone" /> · @(s.User.TelegramChatId is null ? "Telegram ulanmagan" : "Telegram ✓")</div></div></div>
                 <label class="lbl">Ism-familiya</label><input class="input" @bind="name" />
-                <label class="lbl">Telefon</label><input class="input" @bind="phone" />
+                <label class="lbl">Telefon</label><input class="input" type="tel" inputmode="tel" maxlength="17" data-phone placeholder="+998 90 123 45 67" @bind="phone" />
                 <label class="lbl">Email</label><input class="input" @bind="email" />
                 <div class="form-row"><div><label class="lbl">Holat</label><select class="input" @bind="status">@foreach (var x in Enum.GetValues<StudentStatus>()) { <option value="@x">@Labels.StudentStatus(x)</option> }</select></div><div><label class="lbl">Maqsad ball</label><input class="input" type="number" min="400" max="1600" @bind="target" /></div></div>
                 <label class="lbl">Izoh (faqat xodimlar ko'radi)</label><textarea class="input" @bind="notes" rows="2"></textarea>
@@ -31,8 +31,8 @@ else
             </div>
             <div class="card">
                 <h3>Ota-onalar</h3>
-                <div class="list mt-s">@foreach (var p in s.Parents) { <div class="list-item"><div class="grow"><div class="title">@p.ParentUser.FullName</div><div class="sub">@p.ParentUser.Phone</div></div><button class="btn sm danger" @onclick="() => UnlinkAsync(p.ParentUserId)">Uzish</button></div> }</div>
-                <div class="row mt-s"><select class="input sm" @bind="linkParent"><option value="0">— ota-ona —</option>@foreach (var p in parents) { <option value="@p.Id">@p.FullName (@p.Phone)</option> }</select><button class="btn sm" @onclick="LinkAsync" disabled="@(linkParent == 0)">Bog'lash</button></div>
+                <div class="list mt-s">@foreach (var p in s.Parents) { <div class="list-item"><div class="grow"><div class="title">@p.ParentUser.FullName</div><div class="sub"><PhoneLink Value="@p.ParentUser.Phone" /></div></div><button class="btn sm danger" @onclick="() => UnlinkAsync(p.ParentUserId)">Uzish</button></div> }</div>
+                <div class="row mt-s"><select class="input sm" @bind="linkParent"><option value="0">— ota-ona —</option>@foreach (var p in parents) { <option value="@p.Id">@p.FullName (@PhoneFormat.Display(p.Phone))</option> }</select><button class="btn sm" @onclick="LinkAsync" disabled="@(linkParent == 0)">Bog'lash</button></div>
             </div>
         </div>
         <div><StudentProgressPanel StudentId="StudentId" /></div>
@@ -53,7 +53,7 @@ else
     {
         s = await Academy.StudentAsync(StudentId);
         if (s is null) return;
-        name = s.User.FullName; phone = s.User.Phone; email = s.User.Email ?? ""; notes = s.Notes ?? ""; status = s.Status; target = s.TargetScore; active = s.User.IsActive; newPassword = "";
+        name = s.User.FullName; phone = PhoneFormat.Display(s.User.Phone); email = s.User.Email ?? ""; notes = s.Notes ?? ""; status = s.Status; target = s.TargetScore; active = s.User.IsActive; newPassword = "";
     }
     private async Task SaveAsync()
     {

@@ -36,15 +36,9 @@ public partial class AuthService(
 
     // ---------------------------------------------------------------- validation
 
-    public static string NormalizePhone(string input)
-    {
-        var digits = new string((input ?? "").Where(char.IsDigit).ToArray());
-        if (digits.Length == 9) digits = "998" + digits;
-        if (digits.Length == 10 && digits[0] == '0') digits = "998" + digits[1..];
-        return "+" + digits;
-    }
+    public static string NormalizePhone(string input) => PhoneFormat.Normalize(input);
 
-    public static bool IsValidPhone(string normalized) => PhoneRegex().IsMatch(normalized);
+    public static bool IsValidPhone(string normalized) => PhoneFormat.IsValid(normalized);
 
     public static string? ValidatePassword(string? password) =>
         string.IsNullOrEmpty(password) || password.Length < 6 ? "Parol kamida 6 ta belgidan iborat bo'lishi kerak." :
@@ -54,7 +48,6 @@ public partial class AuthService(
         string.IsNullOrWhiteSpace(name) || name.Trim().Length < 2 ? "Ism-familiyani kiriting." :
         name.Trim().Length > 120 ? "Ism juda uzun." : null;
 
-    [GeneratedRegex(@"^\+\d{10,15}$")] private static partial Regex PhoneRegex();
 
     public static string HashPassword(User user, string password) => Hasher.HashPassword(user, password);
 
@@ -70,7 +63,7 @@ public partial class AuthService(
     public async Task<LoginResult> LoginWithPasswordAsync(string phoneInput, string password)
     {
         var phone = NormalizePhone(phoneInput);
-        if (!IsValidPhone(phone)) return new(null, "Telefon raqam noto'g'ri.");
+        if (!IsValidPhone(phone)) return new(null, PhoneFormat.InvalidMessage);
 
         if (PasswordFailures.TryGetValue(phone, out var f) && f.Failures >= MaxPasswordFailures)
         {
@@ -106,7 +99,7 @@ public partial class AuthService(
     public async Task<CodeRequestResult> RequestCodeAsync(string phoneInput, string purpose)
     {
         var phone = NormalizePhone(phoneInput);
-        if (!IsValidPhone(phone)) return new(CodeDelivery.Dev, null, bot.BotUsername, null, "Telefon raqam noto'g'ri. Masalan: +998 90 123 45 67");
+        if (!IsValidPhone(phone)) return new(CodeDelivery.Dev, null, bot.BotUsername, null, PhoneFormat.InvalidMessage);
 
         await using var db = await factory.CreateDbContextAsync();
         var exists = await db.Users.AnyAsync(u => u.Phone == phone);
@@ -223,6 +216,7 @@ public partial class AuthService(
         if (ValidateName(r.FullName) is string nerr) return new(null, nerr);
         if (ValidatePassword(r.Password) is string perr) return new(null, perr);
         var phone = NormalizePhone(r.Phone);
+        if (!IsValidPhone(phone)) return new(null, PhoneFormat.InvalidMessage);
         if (await CheckCodeAsync(phone, r.Code, consume: false) is string cerr) return new(null, cerr);
 
         await using var db = await factory.CreateDbContextAsync();

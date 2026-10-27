@@ -23,7 +23,7 @@ else
         <tbody>@foreach (var s in Filtered)
         {
             <tr class="click" @onclick="@(() => Nav.NavigateTo($"/admin/students/{s.StudentId}"))">
-                <td class="bold">@s.Name</td><td>@s.Phone</td><td>@s.Groups</td><td><span class="badge @(s.Status == StudentStatus.Active ? "ok" : "")">@Labels.StudentStatus(s.Status)</span></td>
+                <td class="bold">@s.Name</td><td><PhoneLink Value="@s.Phone" /></td><td>@s.Groups</td><td><span class="badge @(s.Status == StudentStatus.Active ? "ok" : "")">@Labels.StudentStatus(s.Status)</span></td>
                 <td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Target?.ToString() ?? "—")</td><td class="num">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num">@(s.Attendance?.ToString() ?? "—")%</td><td>@Tz.Fmt(s.LastActive)</td>
                 <td><a class="btn sm" href="/admin/students/@s.StudentId">Ochish</a></td>
             </tr>
@@ -31,7 +31,7 @@ else
 
     <Modal Open="createOpen" OpenChanged="v => createOpen = v" Title="Yangi o'quvchi">
         <label class="lbl">Ism-familiya</label><input class="input" @bind="nName" />
-        <label class="lbl">Telefon</label><input class="input" @bind="nPhone" placeholder="+998 90 123 45 67" />
+        <label class="lbl">Telefon</label><input class="input" type="tel" inputmode="tel" maxlength="17" data-phone placeholder="+998 90 123 45 67" @bind="nPhone" />
         <div class="form-row"><div><label class="lbl">Parol</label><input class="input" @bind="nPassword" placeholder="kamida 6 belgi" /></div><div><label class="lbl">Maqsad ball</label><input class="input" type="number" min="400" max="1600" @bind="nTarget" /></div></div>
         <label class="lbl">Guruh (ixtiyoriy)</label><select class="input" @bind="nGroup"><option value="0">—</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select>
         <div class="hint">O'quvchi Telegram botga raqamini yuborsa, parolsiz havola orqali ham kira oladi.</div>
@@ -50,7 +50,7 @@ else
     private int? nTarget;
 
     private IEnumerable<AnalyticsService.StudentSummary> Filtered => students.Where(s =>
-        (string.IsNullOrWhiteSpace(search) || s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || s.Phone.Contains(search)) &&
+        (string.IsNullOrWhiteSpace(search) || s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || PhoneFormat.Matches(s.Phone, search)) &&
         (status == "" || s.Status.ToString() == status) &&
         (groupId == 0 || s.Groups.Split(", ").Contains(groups.FirstOrDefault(g => g.Id == groupId)?.Name)) &&
         (scoreBand switch { "none" => s.Score is null, "lt1000" => s.Score < 1000, "1000-1200" => s.Score is >= 1000 and < 1200, "1200-1400" => s.Score is >= 1200 and < 1400, "gt1400" => s.Score >= 1400, _ => true }));

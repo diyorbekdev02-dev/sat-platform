@@ -12,7 +12,7 @@ else if (user is not null)
     <div class="grid c2">
         <div class="stack">
             <div class="card">
-                <div class="row mb"><div class="avatar lg" style="background:@user.AvatarColor">@initials</div><div><h2>@user.FullName</h2><div class="muted small">@Labels.Role(user.Role) · @user.Phone</div></div></div>
+                <div class="row mb"><div class="avatar lg" style="background:@user.AvatarColor">@initials</div><div><h2>@user.FullName</h2><div class="muted small">@Labels.Role(user.Role) · <PhoneLink Value="@user.Phone" /></div></div></div>
                 <label class="lbl">Ism-familiya</label>
                 <input class="input" @bind="fullName" />
                 <label class="lbl">Email (ixtiyoriy)</label>
@@ -66,7 +66,7 @@ else if (user is not null)
                     @if (student is not null && student.Parents.Count > 0)
                     {
                         <h3 class="mt">Bog'langan ota-onalar</h3>
-                        <div class="list">@foreach (var p in student.Parents) { <div class="list-item"><div class="grow"><div class="title">@p.ParentUser.FullName</div><div class="sub">@p.ParentUser.Phone</div></div></div> }</div>
+                        <div class="list">@foreach (var p in student.Parents) { <div class="list-item"><div class="grow"><div class="title">@p.ParentUser.FullName</div><div class="sub"><PhoneLink Value="@p.ParentUser.Phone" /></div></div></div> }</div>
                     }
                 </div>
             }

@@ -391,3 +391,5 @@ select.input { appearance: auto; }
 #blazor-error-ui .reload { margin-left: 10px; font-weight: 700; } #blazor-error-ui .dismiss { float: right; cursor: pointer; }
 .editor.compact .ql-container { min-height: 48px; } .editor.compact .ql-editor { min-height: 48px; padding: 8px 10px; } .editor.compact .ql-toolbar { padding: 3px 6px; }
 .editor.compact .ql-toolbar .ql-formats { margin-right: 6px; }
+.phone-link { color: inherit; text-decoration: none; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.phone-link:hover { color: var(--link); text-decoration: underline; }

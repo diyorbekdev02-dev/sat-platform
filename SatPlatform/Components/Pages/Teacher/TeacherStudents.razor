@@ -18,7 +18,7 @@ else
         <tbody>@foreach (var s in Sorted)
         {
             <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/students/{s.StudentId}"))">
-                <td class="bold">@s.Name<div class="tiny muted">@s.Phone</div></td><td>@s.Groups</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num @(s.Accuracy is < 50 ? "level-weak" : "")">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num @(s.Attendance is < 80 ? "level-weak" : "")">@(s.Attendance?.ToString() ?? "—")%</td>
+                <td class="bold">@s.Name<div class="tiny muted"><PhoneLink Value="@s.Phone" /></div></td><td>@s.Groups</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num @(s.Accuracy is < 50 ? "level-weak" : "")">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num @(s.Attendance is < 80 ? "level-weak" : "")">@(s.Attendance?.ToString() ?? "—")%</td>
                 <td>@(s.WeakestSkill is null ? "—" : $"{s.WeakestSkill} ({s.WeakestAccuracy}%)")</td><td>@Tz.Fmt(s.LastActive)</td><td><a class="btn sm" href="/teacher/students/@s.StudentId">Ochish</a></td>
             </tr>
         }</tbody></table></div>
@@ -33,7 +33,7 @@ else
     {
         get
         {
-            var q = students.Where(s => string.IsNullOrWhiteSpace(search) || s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || s.Phone.Contains(search));
+            var q = students.Where(s => string.IsNullOrWhiteSpace(search) || s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || PhoneFormat.Matches(s.Phone, search));
             return sort switch { "score" => q.OrderByDescending(s => s.Score ?? 0), "weak" => q.OrderBy(s => s.Accuracy ?? 101), "active" => q.OrderByDescending(s => s.LastActive), _ => q.OrderBy(s => s.Name) };
         }
     }

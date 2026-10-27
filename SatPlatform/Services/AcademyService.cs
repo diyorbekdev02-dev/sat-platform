@@ -56,7 +56,7 @@ public class AcademyService(IDbContextFactory<AppDbContext> factory, AuditServic
     {
         if (AuthService.ValidateName(fullName) is string nerr) return (0, nerr);
         var normalized = AuthService.NormalizePhone(phone);
-        if (!AuthService.IsValidPhone(normalized)) return (0, "Telefon raqam noto'g'ri.");
+        if (!AuthService.IsValidPhone(normalized)) return (0, PhoneFormat.InvalidMessage);
         if (!string.IsNullOrEmpty(password) && AuthService.ValidatePassword(password) is string perr) return (0, perr);
         await using var db = await factory.CreateDbContextAsync();
         if (await db.Users.AnyAsync(u => u.Phone == normalized)) return (0, "Bu raqam allaqachon ro'yxatdan o'tgan.");
@@ -74,7 +74,7 @@ public class AcademyService(IDbContextFactory<AppDbContext> factory, AuditServic
     {
         if (AuthService.ValidateName(fullName) is string nerr) return nerr;
         var normalized = AuthService.NormalizePhone(phone);
-        if (!AuthService.IsValidPhone(normalized)) return "Telefon raqam noto'g'ri.";
+        if (!AuthService.IsValidPhone(normalized)) return PhoneFormat.InvalidMessage;
         if (!string.IsNullOrEmpty(newPassword) && AuthService.ValidatePassword(newPassword) is string perr) return perr;
         await using var db = await factory.CreateDbContextAsync();
         var user = await db.Users.Include(u => u.Student).FirstOrDefaultAsync(u => u.Id == id);

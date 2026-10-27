@@ -11,7 +11,7 @@ else
 {
     <div class="card mb">
         <div class="row between">
-            <div class="row"><div class="avatar lg" style="background:@student.User.AvatarColor">@student.User.FullName[0]</div><div><h1>@student.User.FullName</h1><div class="muted small">@student.User.Phone · @string.Join(", ", student.Enrollments.Where(e => e.Status == EnrollmentStatus.Active).Select(e => $"{e.Group.Name} ({e.Group.TeacherUser?.FullName ?? "—"})")) · <span class="badge">@Labels.StudentStatus(student.Status)</span></div></div></div>
+            <div class="row"><div class="avatar lg" style="background:@student.User.AvatarColor">@student.User.FullName[0]</div><div><h1>@student.User.FullName</h1><div class="muted small"><PhoneLink Value="@student.User.Phone" /> · @string.Join(", ", student.Enrollments.Where(e => e.Status == EnrollmentStatus.Active).Select(e => $"{e.Group.Name} ({e.Group.TeacherUser?.FullName ?? "—"})")) · <span class="badge">@Labels.StudentStatus(student.Status)</span></div></div></div>
             <div class="row"><a class="btn" href="/teacher/assign?student=@StudentId"><Icon Name="send" /> Test tayinlash</a><a class="btn" href="/teacher/homework/new?student=@StudentId"><Icon Name="clipboard" /> Uy vazifasi</a>@if (isAdmin) { <a class="btn" href="/admin/students/@StudentId"><Icon Name="pencil" /> Tahrirlash</a> }</div>
         </div>
         @if (!string.IsNullOrWhiteSpace(student.Notes)) { <div class="alert mt-s">@student.Notes</div> }

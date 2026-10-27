@@ -183,3 +183,38 @@ public class KeepAliveScheduleTests
         Assert.Equal(TimeSpan.FromDays(1), s.UntilNextStart(TashkentUtc(7)));
     }
 }
+
+public class PhoneFormatTests
+{
+    [Theory]
+    [InlineData("+998 90 123 45 67", true)]
+    [InlineData("90-123-45-67", true)]
+    [InlineData("(90) 123 45 67", true)]
+    [InlineData("0901234567", true)]
+    [InlineData("998941234567", true)]
+    [InlineData("+998 33 123 45 67", true)]
+    [InlineData("+998 12 345 67 89", false)]   // no such operator code
+    [InlineData("+998 90 123 45", false)]      // too short
+    [InlineData("+998 90 123 45 678", false)]  // too long
+    [InlineData("+7 912 345 67 89", false)]    // not Uzbekistan
+    [InlineData("+1 202 555 0143", false)]
+    [InlineData("", false)]
+    [InlineData("abc", false)]
+    public void Only_uzbek_mobile_numbers_are_valid(string input, bool valid) => Assert.Equal(valid, PhoneFormat.IsValid(input));
+
+    [Theory]
+    [InlineData("+998901234567", "+998 90 123 45 67")]
+    [InlineData("901234567", "+998 90 123 45 67")]
+    [InlineData("+7 912 345 67 89", "+7 912 345 67 89")]   // foreign input is left as typed
+    [InlineData("", "")]
+    public void Display_is_grouped(string input, string shown) => Assert.Equal(shown, PhoneFormat.Display(input));
+
+    [Fact]
+    public void Search_matches_digits_only()
+    {
+        Assert.True(PhoneFormat.Matches("+998901234567", "90 123"));
+        Assert.True(PhoneFormat.Matches("+998901234567", "+998 90"));
+        Assert.False(PhoneFormat.Matches("+998901234567", "Ali"));   // a name must not match every phone
+        Assert.False(PhoneFormat.Matches("+998901234567", ""));
+    }
+}

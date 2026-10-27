@@ -29,7 +29,7 @@ else
             <tbody>@foreach (var s in students)
             {
                 <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/students/{s.StudentId}"))">
-                    <td class="bold">@s.Name</td><td>@s.Phone</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Target?.ToString() ?? "—")</td>
+                    <td class="bold">@s.Name</td><td><PhoneLink Value="@s.Phone" /></td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Target?.ToString() ?? "—")</td>
                     <td class="num @(s.Accuracy is < 50 ? "level-weak" : "")">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num @(s.Attendance is < 80 ? "level-weak" : "")">@(s.Attendance?.ToString() ?? "—")%</td>
                     <td>@(s.WeakestSkill is null ? "—" : $"{s.WeakestSkill} ({s.WeakestAccuracy}%)")</td><td>@Tz.Fmt(s.LastActive)</td><td><a class="btn sm" href="/teacher/students/@s.StudentId">Ochish</a></td>
                 </tr>

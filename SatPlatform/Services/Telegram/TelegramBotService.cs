@@ -91,12 +91,17 @@ public class TelegramBotService(TelegramBotClient bot, AuthService auth, IDbCont
                 return;
             }
             var phone = AuthService.NormalizePhone(u.ContactPhone);
+            if (!AuthService.IsValidPhone(phone))
+            {
+                await bot.SendMessageAsync(u.ChatId, "⚠️ Faqat O'zbekiston raqamlari (+998) qabul qilinadi. Iltimos, O'zbekiston raqamingizni yuboring.", ContactKeyboard, ct);
+                return;
+            }
             var code = await auth.LinkTelegramAsync(phone, u.ChatId, u.Username, u.FirstName);
 
             if (ExpectedPhones.TryRemove(u.ChatId, out var expected) && expected != phone)
             {
                 await bot.SendMessageAsync(u.ChatId,
-                    $"⚠️ Saytda <b>{expected}</b> raqamini kiritgansiz, lekin Telegram hisobingiz <b>{phone}</b> raqamida.\n\nSaytga qaytib <b>{phone}</b> raqami bilan davom eting — kod shu yerga keladi.",
+                    $"⚠️ Saytda <b>{PhoneFormat.Display(expected)}</b> raqamini kiritgansiz, lekin Telegram hisobingiz <b>{PhoneFormat.Display(phone)}</b> raqamida.\n\nSaytga qaytib <b>{PhoneFormat.Display(phone)}</b> raqami bilan davom eting — kod shu yerga keladi.",
                     RemoveKeyboard, ct);
                 return;
             }
@@ -104,7 +109,7 @@ public class TelegramBotService(TelegramBotClient bot, AuthService auth, IDbCont
             var user = await db.Users.FirstOrDefaultAsync(x => x.Phone == phone, ct);
             if (user is not null)
             {
-                var text = $"✅ Raqamingiz bog'landi: <b>{phone}</b>\n";
+                var text = $"✅ Raqamingiz bog'landi: <b>{PhoneFormat.Display(phone)}</b>\n";
                 if (code is not null) text += $"\n🔐 Tasdiqlash kodingiz: <code>{code}</code>\nSaytga qaytib kodni kiriting.\n";
                 text += $"\nSaytga parolsiz kirish uchun havola (15 daqiqa amal qiladi):\n{await MagicLinkAsync(user.Id)}\n\nBildirishnomalar (natijalar, davomat, uy vazifasi) shu yerga keladi.";
                 await bot.SendMessageAsync(u.ChatId, text, RemoveKeyboard, ct);
@@ -114,14 +119,14 @@ public class TelegramBotService(TelegramBotClient bot, AuthService auth, IDbCont
             if (code is not null)
             {
                 // the user is registering on the site: just deliver the code
-                await bot.SendMessageAsync(u.ChatId, $"✅ Raqamingiz saqlandi: <b>{phone}</b>\n\n🔐 Tasdiqlash kodingiz: <code>{code}</code>\n\nSaytga qaytib kodni kiriting.", RemoveKeyboard, ct);
+                await bot.SendMessageAsync(u.ChatId, $"✅ Raqamingiz saqlandi: <b>{PhoneFormat.Display(phone)}</b>\n\n🔐 Tasdiqlash kodingiz: <code>{code}</code>\n\nSaytga qaytib kodni kiriting.", RemoveKeyboard, ct);
                 return;
             }
 
             // unknown phone → in-bot registration wizard
             await SetStateAsync(db, u.ChatId, "role", phone: phone, ct: ct);
             await bot.SendMessageAsync(u.ChatId,
-                $"✅ Raqamingiz: <b>{phone}</b>\n\nBu raqam hali ro'yxatdan o'tmagan. Ro'yxatdan o'tamizmi? Siz kimsiz?",
+                $"✅ Raqamingiz: <b>{PhoneFormat.Display(phone)}</b>\n\nBu raqam hali ro'yxatdan o'tmagan. Ro'yxatdan o'tamizmi? Siz kimsiz?",
                 RoleKeyboard, ct);
             return;
         }
@@ -139,7 +144,7 @@ public class TelegramBotService(TelegramBotClient bot, AuthService auth, IDbCont
             var known = await db.Users.AnyAsync(x => x.TelegramChatId == u.ChatId, ct);
             var text = "Salom! 👋 Bu SAT tayyorlov platformasining boti.\n\n";
             text += sitePhone is not null
-                ? $"Saytda <b>{sitePhone}</b> raqami kiritildi. Tasdiqlash uchun pastdagi tugma orqali telefon raqamingizni yuboring — kod shu yerga keladi."
+                ? $"Saytda <b>{PhoneFormat.Display(sitePhone)}</b> raqami kiritildi. Tasdiqlash uchun pastdagi tugma orqali telefon raqamingizni yuboring — kod shu yerga keladi."
                 : known
                     ? "Hisobingiz bog'langan. /login — saytga kirish havolasi, /help — yordam."
                     : "Ro'yxatdan o'tish yoki hisobni bog'lash uchun pastdagi tugma orqali telefon raqamingizni yuboring.";

@@ -39,8 +39,8 @@ else
             @if (editing.Id > 0)
             {
                 <h3 class="mt">O'quvchilar (@members.Count)</h3>
-                <div class="list" style="max-height:260px;overflow:auto">@foreach (var m in members) { <div class="list-item"><div class="grow"><div class="title">@m.User.FullName</div><div class="sub">@m.User.Phone</div></div><button class="btn sm danger" @onclick="() => UnenrollAsync(m.Id)">Chiqarish</button></div> }</div>
-                <div class="row mt-s"><select class="input sm" @bind="enrollStudent"><option value="0">— o'quvchi qo'shish —</option>@foreach (var s in allStudents.Where(s => members.All(m => m.Id != s.Id))) { <option value="@s.Id">@s.User.FullName (@s.User.Phone)</option> }</select><button class="btn sm" @onclick="EnrollAsync" disabled="@(enrollStudent == 0)">Qo'shish</button></div>
+                <div class="list" style="max-height:260px;overflow:auto">@foreach (var m in members) { <div class="list-item"><div class="grow"><div class="title">@m.User.FullName</div><div class="sub"><PhoneLink Value="@m.User.Phone" /></div></div><button class="btn sm danger" @onclick="() => UnenrollAsync(m.Id)">Chiqarish</button></div> }</div>
+                <div class="row mt-s"><select class="input sm" @bind="enrollStudent"><option value="0">— o'quvchi qo'shish —</option>@foreach (var s in allStudents.Where(s => members.All(m => m.Id != s.Id))) { <option value="@s.Id">@s.User.FullName (@PhoneFormat.Display(s.User.Phone))</option> }</select><button class="btn sm" @onclick="EnrollAsync" disabled="@(enrollStudent == 0)">Qo'shish</button></div>
             }
         }
     </Modal>
