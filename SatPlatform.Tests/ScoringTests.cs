@@ -125,7 +125,7 @@ public class AuthHelperTests
     [InlineData("901234567", "+998901234567")]
     [InlineData("0901234567", "+998901234567")]
     [InlineData("998901234567", "+998901234567")]
-    public void Phone_normalization(string input, string expected) => Assert.Equal(expected, AuthService.NormalizePhone(input));
+    public void Phone_normalization(string input, string expected) => Assert.Equal(expected, PhoneFormat.Normalize(input));
 
     [Fact]
     public void Password_rules()

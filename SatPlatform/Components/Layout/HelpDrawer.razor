@@ -1,0 +1,37 @@
+@inject IJSRuntime JS
+
+<div class="help-backdrop" @onclick="OnClose"></div>
+<aside id="help-drawer" class="help-drawer" tabindex="-1" role="dialog" aria-label="Qo'llanma" @onkeydown="OnKey">
+    <div class="help-head">
+        <div>
+            <div class="help-kicker">Qo'llanma</div>
+            <h2>@Topic.Title</h2>
+        </div>
+        <button class="icon-btn" @onclick="OnClose" aria-label="Yopish"><Icon Name="x" Size="20" /></button>
+    </div>
+    <div class="help-body">
+        <p class="help-intro">@Topic.Intro</p>
+        @foreach (var s in Topic.Sections)
+        {
+            <section class="help-section">
+                <h3>@s.Heading</h3>
+                <ul>@foreach (var item in s.Items) { <li>@((MarkupString)item)</li> }</ul>
+            </section>
+        }
+    </div>
+    <div class="help-foot">
+        <a class="btn sm" href="@PdfUrl" target="_blank"><Icon Name="download" Size="16" /> To'liq qo'llanma (PDF)</a>
+        <button class="btn sm primary" @onclick="OnClose">Tushunarli</button>
+    </div>
+</aside>
+
+@code {
+    [Parameter, EditorRequired] public HelpTopic Topic { get; set; } = null!;
+    [Parameter, EditorRequired] public string PdfUrl { get; set; } = "";
+    [Parameter] public EventCallback OnClose { get; set; }
+
+    // rendered only while open, so the first render is the opening: move focus into the panel so Esc works
+    protected override async Task OnAfterRenderAsync(bool first) { if (first) await JS.InvokeVoidAsync("sat.focus", "help-drawer"); }
+
+    private Task OnKey(KeyboardEventArgs e) => e.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
+}

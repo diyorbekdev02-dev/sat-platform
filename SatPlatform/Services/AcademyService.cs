@@ -55,8 +55,8 @@ public class AcademyService(IDbContextFactory<AppDbContext> factory, AuditServic
     public async Task<(int Id, string? Error)> CreateUserAsync(string fullName, string phone, UserRole role, string? password, string? email, int? targetScore, int adminUserId, bool canManageQuestions = false)
     {
         if (AuthService.ValidateName(fullName) is string nerr) return (0, nerr);
-        var normalized = AuthService.NormalizePhone(phone);
-        if (!AuthService.IsValidPhone(normalized)) return (0, PhoneFormat.InvalidMessage);
+        var normalized = PhoneFormat.Normalize(phone);
+        if (!PhoneFormat.IsValid(normalized)) return (0, PhoneFormat.InvalidMessage);
         if (!string.IsNullOrEmpty(password) && AuthService.ValidatePassword(password) is string perr) return (0, perr);
         await using var db = await factory.CreateDbContextAsync();
         if (await db.Users.AnyAsync(u => u.Phone == normalized)) return (0, "Bu raqam allaqachon ro'yxatdan o'tgan.");
@@ -73,8 +73,8 @@ public class AcademyService(IDbContextFactory<AppDbContext> factory, AuditServic
     public async Task<string?> UpdateUserAsync(int id, string fullName, string phone, string? email, UserRole role, bool isActive, bool canManageQuestions, string? newPassword, int adminUserId, int? targetScore = null, StudentStatus? studentStatus = null, string? notes = null)
     {
         if (AuthService.ValidateName(fullName) is string nerr) return nerr;
-        var normalized = AuthService.NormalizePhone(phone);
-        if (!AuthService.IsValidPhone(normalized)) return PhoneFormat.InvalidMessage;
+        var normalized = PhoneFormat.Normalize(phone);
+        if (!PhoneFormat.IsValid(normalized)) return PhoneFormat.InvalidMessage;
         if (!string.IsNullOrEmpty(newPassword) && AuthService.ValidatePassword(newPassword) is string perr) return perr;
         await using var db = await factory.CreateDbContextAsync();
         var user = await db.Users.Include(u => u.Student).FirstOrDefaultAsync(u => u.Id == id);

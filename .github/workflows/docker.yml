@@ -3,7 +3,13 @@ name: docker-image
 on:
   push:
     branches: [main]
+    paths-ignore: ["docs/**", "**.md", "SatPlatform.Tests/**"]
   workflow_dispatch:
+
+# a newer push supersedes a running build/deploy
+concurrency:
+  group: docker-image
+  cancel-in-progress: true
 
 permissions:
   contents: read

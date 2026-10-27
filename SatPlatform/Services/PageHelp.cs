@@ -1,7 +1,11 @@
+using SatPlatform.Data;
+
 namespace SatPlatform.Services;
 
 public record HelpSection(string Heading, string[] Items);
 public record HelpTopic(string Title, string Intro, HelpSection[] Sections);
+public record QuickTip(string Title, string Text, string Icon);
+public record Manual(string Intro, QuickTip[] Tips);
 
 /// <summary>In-app, per-page user guide: opened from the «Qo'llanma» button in the top bar. Text may contain &lt;b&gt; and &lt;code&gt;.</summary>
 public static class PageHelp
@@ -16,6 +20,52 @@ public static class PageHelp
     }
 
     public static HelpTopic? Find(string path) => Topics.GetValueOrDefault(Key(path));
+
+    // ---------------------------------------------------------------- per-role manual (PDF + /help header)
+
+    public static string Slug(UserRole? role) => role switch
+    {
+        UserRole.Admin or UserRole.SuperAdmin => "admin",
+        UserRole.Teacher or UserRole.Assistant => "teacher",
+        UserRole.Parent => "parent",
+        _ => "student",
+    };
+
+    public static string PdfUrl(UserRole? role) => $"/qollanma-{Slug(role)}.pdf";
+
+    public static Manual ManualFor(UserRole? role) => Manuals[Slug(role)];
+
+    private static readonly Dictionary<string, Manual> Manuals = new()
+    {
+        ["admin"] = new("Administrator qo'llanmasi: savollar banki, test builder, o'quvchilar, xodimlar, guruhlar, materiallar, sozlamalar, audit, Telegram bot.",
+        [
+            new("Savollar banki", "Savol qo'shing, Faol holatga o'tkazing (izoh majburiy). Matn o'zgarsa yangi versiya yaratiladi.", "database"),
+            new("Test builder", "Modullarga savol qo'shing yoki avto-generatsiya qiling, Preview qiling va Chop eting.", "tests"),
+            new("Hisoblar", "O'qituvchi, assistent va admin hisoblarini faqat siz yaratasiz (Xodimlar va ota-onalar).", "user"),
+            new("Sozlamalar", "Scoring jadvali, adaptiv qoidalar, modul vaqtlari va mustaqil ro'yxatdan o'tish.", "settings"),
+        ]),
+        ["teacher"] = new("O'qituvchi va assistent qo'llanmasi: guruhlar, o'quvchilar, davomat, test tayinlash, uy vazifasi, tahlil.",
+        [
+            new("Davomat", "Guruh va sanani tanlang, belgilang va saqlang — kelmagan o'quvchining ota-onasiga Telegram xabar boradi.", "calendar"),
+            new("Test tayinlash", "Chop etilgan testni guruh yoki o'quvchiga muddat va urinishlar soni bilan tayinlang.", "tests"),
+            new("Uy vazifasi", "Mashq, test yoki fayl turida vazifa bering va topshirilganlarni baholang.", "clipboard"),
+            new("Zaif o'quvchilar", "Bosh sahifa e'tibor talab qiladigan o'quvchilarni ko'rsatadi.", "chart"),
+        ]),
+        ["parent"] = new("Ota-ona qo'llanmasi: farzandingizning ballari, testlari, davomati va zaif mavzularini qanday ko'rish.",
+        [
+            new("Farzandim", "Joriy ball, maqsad, aniqlik, davomat va ball dinamikasi bir sahifada.", "home"),
+            new("Farzand qo'shish", "Profil → «Farzandni bog'lash» orqali o'quvchining ota-ona kodini kiriting.", "user"),
+            new("Davomat", "Farzandingiz darsga kelmasa yoki kechiksa Telegramga xabar keladi.", "calendar"),
+            new("Telegram bot", "@sat_notificationbot: /start — hisobni bog'lash, /login — parolsiz kirish havolasi.", "telegram"),
+        ]),
+        ["student"] = new("O'quvchi qo'llanmasi: kirish, testlar, test oynasi, mashq, xatolar, tahlil, materiallar, uy vazifasi, Telegram bot.",
+        [
+            new("Birinchi qadam", "Diagnostik testni ishlang — tizim zaif mavzularingizni aniqlab, har kuni nimani mashq qilishni aytadi.", "play"),
+            new("Test oynasi", "A/B/C/D tugmalari — javob, F — belgilash, G — savollar jadvali, ← → — oldingi/keyingi savol.", "tests"),
+            new("Internet uzilsa", "Javoblar brauzerda saqlanadi va ulanish qaytgach yuboriladi. Taymer serverda davom etadi.", "zap"),
+            new("Telegram bot", "@sat_notificationbot: /start — hisobni bog'lash, /login — parolsiz kirish havolasi.", "telegram"),
+        ]),
+    };
 
     private static HelpSection S(string heading, params string[] items) => new(heading, items);
     private static HelpTopic T(string title, string intro, params HelpSection[] sections) => new(title, intro, sections);

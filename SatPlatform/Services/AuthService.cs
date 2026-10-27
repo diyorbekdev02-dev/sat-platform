@@ -1,7 +1,6 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Security.Cryptography;
-using System.Text.RegularExpressions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using SatPlatform.Data;
@@ -15,7 +14,7 @@ public record CodeRequestResult(CodeDelivery Delivery, string? DevCode, string? 
 public record CodeStatus(bool Delivered);
 public record LoginResult(User? User, string? Error);
 
-public partial class AuthService(
+public class AuthService(
     IDbContextFactory<AppDbContext> factory,
     TelegramBotClient bot,
     SettingsService settings,
@@ -36,10 +35,6 @@ public partial class AuthService(
 
     // ---------------------------------------------------------------- validation
 
-    public static string NormalizePhone(string input) => PhoneFormat.Normalize(input);
-
-    public static bool IsValidPhone(string normalized) => PhoneFormat.IsValid(normalized);
-
     public static string? ValidatePassword(string? password) =>
         string.IsNullOrEmpty(password) || password.Length < 6 ? "Parol kamida 6 ta belgidan iborat bo'lishi kerak." :
         password.Length > 128 ? "Parol juda uzun." : null;
@@ -47,7 +42,6 @@ public partial class AuthService(
     public static string? ValidateName(string? name) =>
         string.IsNullOrWhiteSpace(name) || name.Trim().Length < 2 ? "Ism-familiyani kiriting." :
         name.Trim().Length > 120 ? "Ism juda uzun." : null;
-
 
     public static string HashPassword(User user, string password) => Hasher.HashPassword(user, password);
 
@@ -62,8 +56,8 @@ public partial class AuthService(
 
     public async Task<LoginResult> LoginWithPasswordAsync(string phoneInput, string password)
     {
-        var phone = NormalizePhone(phoneInput);
-        if (!IsValidPhone(phone)) return new(null, PhoneFormat.InvalidMessage);
+        var phone = PhoneFormat.Normalize(phoneInput);
+        if (!PhoneFormat.IsValid(phone)) return new(null, PhoneFormat.InvalidMessage);
 
         if (PasswordFailures.TryGetValue(phone, out var f) && f.Failures >= MaxPasswordFailures)
         {
@@ -98,8 +92,8 @@ public partial class AuthService(
     /// <summary>Sends a code to the phone's Telegram (or returns the deep link to open the bot first).</summary>
     public async Task<CodeRequestResult> RequestCodeAsync(string phoneInput, string purpose)
     {
-        var phone = NormalizePhone(phoneInput);
-        if (!IsValidPhone(phone)) return new(CodeDelivery.Dev, null, bot.BotUsername, null, PhoneFormat.InvalidMessage);
+        var phone = PhoneFormat.Normalize(phoneInput);
+        if (!PhoneFormat.IsValid(phone)) return new(CodeDelivery.Dev, null, bot.BotUsername, null, PhoneFormat.InvalidMessage);
 
         await using var db = await factory.CreateDbContextAsync();
         var exists = await db.Users.AnyAsync(u => u.Phone == phone);
@@ -151,7 +145,7 @@ public partial class AuthService(
 
     public async Task<CodeStatus> GetCodeStatusAsync(string phoneInput)
     {
-        var phone = NormalizePhone(phoneInput);
+        var phone = PhoneFormat.Normalize(phoneInput);
         await using var db = await factory.CreateDbContextAsync();
         var delivered = await db.PhoneVerifications
             .Where(v => v.Phone == phone && !v.Consumed && v.ExpiresAt > DateTime.UtcNow)
@@ -189,7 +183,7 @@ public partial class AuthService(
     /// <summary>Checks a code without consuming it (so the user can proceed to the profile step).</summary>
     public async Task<string?> CheckCodeAsync(string phoneInput, string code, bool consume)
     {
-        var phone = NormalizePhone(phoneInput);
+        var phone = PhoneFormat.Normalize(phoneInput);
         code = (code ?? "").Trim();
         await using var db = await factory.CreateDbContextAsync();
         var v = await db.PhoneVerifications.Where(x => x.Phone == phone && !x.Consumed).OrderByDescending(x => x.CreatedAt).FirstOrDefaultAsync();
@@ -215,8 +209,8 @@ public partial class AuthService(
         if (r.Role is not (UserRole.Student or UserRole.Parent)) return new(null, "Faqat o'quvchi yoki ota-ona ro'yxatdan o'ta oladi.");
         if (ValidateName(r.FullName) is string nerr) return new(null, nerr);
         if (ValidatePassword(r.Password) is string perr) return new(null, perr);
-        var phone = NormalizePhone(r.Phone);
-        if (!IsValidPhone(phone)) return new(null, PhoneFormat.InvalidMessage);
+        var phone = PhoneFormat.Normalize(r.Phone);
+        if (!PhoneFormat.IsValid(phone)) return new(null, PhoneFormat.InvalidMessage);
         if (await CheckCodeAsync(phone, r.Code, consume: false) is string cerr) return new(null, cerr);
 
         await using var db = await factory.CreateDbContextAsync();
@@ -275,7 +269,7 @@ public partial class AuthService(
     /// <summary>Login by Telegram code (also used for "forgot password").</summary>
     public async Task<LoginResult> LoginWithCodeAsync(string phoneInput, string code)
     {
-        var phone = NormalizePhone(phoneInput);
+        var phone = PhoneFormat.Normalize(phoneInput);
         if (await CheckCodeAsync(phone, code, consume: true) is string cerr) return new(null, cerr);
         await using var db = await factory.CreateDbContextAsync();
         var user = await db.Users.Include(u => u.Student).FirstOrDefaultAsync(u => u.Phone == phone);

@@ -28,7 +28,7 @@
                     <button class="@(role == UserRole.Parent ? "active" : "")" @onclick="() => role = UserRole.Parent">👨‍👩‍👧 Ota-ona<span class="sub">Farzandim natijasini ko'raman</span></button>
                 </div>
                 <label class="lbl">Telefon raqam</label>
-                <input class="input phone-input" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" data-phone maxlength="17" @bind="phone" @bind:event="oninput" @onkeydown="@(e => { if (e.Key == "Enter") _ = RequestCodeAsync(); })" autofocus />
+                <input class="input phone-input" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" data-phone @bind="phone" @bind:event="oninput" @onkeydown="@(e => { if (e.Key == "Enter") _ = RequestCodeAsync(); })" autofocus />
                 @if (Error is not null) { <div class="error">@Error</div> }
                 <button class="btn primary lg full mt" @onclick="RequestCodeAsync" disabled="@busy">Davom etish</button>
                 @if (botUser is not null)

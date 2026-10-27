@@ -137,7 +137,7 @@ window.sat = (() => {
     return { ready, startHeartbeat, stopHeartbeat, theme, renderMath, startTimer, stopTimer, backup, deviceCheck, setLeaveGuard, setKeyHandler, toggleLineReader, highlightSelection, clearHighlights, initEditor, destroyEditor, insertTable, download, copy, focus, scrollTop, confirm, print };
 })();
 
-// Uzbek phone mask for every <input data-phone>: always "+998 90 123 45 67", digits only, at most 9 after +998.
+// Uzbek phone mask (mirror of Services/PhoneFormat.cs) for every <input data-phone>: always "+998 90 123 45 67", digits only, at most 9 after +998.
 // Capture phase on document, so Blazor (@bind oninput/onchange) already reads the formatted value.
 document.addEventListener("input", function (e) {
     const el = e.target;

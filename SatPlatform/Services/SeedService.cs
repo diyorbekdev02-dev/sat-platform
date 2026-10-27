@@ -65,7 +65,7 @@ public class SeedService(IDbContextFactory<AppDbContext> factory, IConfiguration
         }
 
         // super admin
-        var adminPhone = AuthService.NormalizePhone(config["Seed:AdminPhone"] ?? "+998900000000");
+        var adminPhone = PhoneFormat.Normalize(config["Seed:AdminPhone"] ?? "+998900000000");
         var adminPassword = config["Seed:AdminPassword"];
         if (!await db.Users.AnyAsync(u => u.Role == UserRole.SuperAdmin))
         {

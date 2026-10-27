@@ -24,7 +24,7 @@
                 <h1>Xush kelibsiz</h1>
                 <p class="muted small">Telefon raqam va parol bilan kiring.</p>
                 <label class="lbl">Telefon raqam</label>
-                <input class="input phone-input" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" data-phone maxlength="17" @bind="phone" @bind:event="oninput" @onkeydown="@(e => { if (e.Key == "Enter") _ = LoginAsync(); })" autofocus />
+                <input class="input phone-input" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" data-phone @bind="phone" @bind:event="oninput" @onkeydown="@(e => { if (e.Key == "Enter") _ = LoginAsync(); })" autofocus />
                 <label class="lbl">Parol</label>
                 <div style="position:relative">
                     <input class="input" type="@(showPw ? "text" : "password")" @bind="password" @bind:event="oninput" @onkeydown="@(e => { if (e.Key == "Enter") _ = LoginAsync(); })" />
@@ -42,7 +42,7 @@
                 <h1>Telegram orqali kirish</h1>
                 <p class="muted small">Raqamingizni kiriting — tasdiqlash kodi Telegram botga keladi. Parol o'rnatilmagan yoki unutilgan bo'lsa ham shu yo'l bilan kirasiz.</p>
                 <label class="lbl">Telefon raqam</label>
-                <input class="input phone-input" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" data-phone maxlength="17" @bind="phone" @bind:event="oninput" @onkeydown="@(e => { if (e.Key == "Enter") _ = RequestCodeAsync(); })" />
+                <input class="input phone-input" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" data-phone @bind="phone" @bind:event="oninput" @onkeydown="@(e => { if (e.Key == "Enter") _ = RequestCodeAsync(); })" />
                 @if (Error is not null) { <div class="error">@Error</div> }
                 <button class="btn primary lg full mt" @onclick="RequestCodeAsync" disabled="@busy">Kod yuborish</button>
                 <div class="auth-links"><button class="link-btn" @onclick="() => { mode = Mode.Password; Error = null; }">← Parol bilan kirish</button></div>

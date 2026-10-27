@@ -1,77 +1,36 @@
 @page "/help"
 @attribute [Authorize]
 @inherits AppPage
-@using SatPlatform.Data
 
 <PageTitle>Qo'llanma</PageTitle>
 
 <div class="row between mb">
-    <div class="muted small">@Intro</div>
+    <div class="muted small">@manual.Intro</div>
     <div class="row">
-        <a class="btn primary" href="@PdfUrl" download="SAT-Platform-qollanma-@(Slug).pdf"><Icon Name="download" /> PDF yuklab olish</a>
-        <a class="btn" href="@PdfUrl" target="_blank"><Icon Name="external" /> Yangi oynada ochish</a>
+        <a class="btn primary" href="@pdfUrl" download="SAT-Platform-qollanma-@(slug).pdf"><Icon Name="download" /> PDF yuklab olish</a>
+        <a class="btn" href="@pdfUrl" target="_blank"><Icon Name="external" /> Yangi oynada ochish</a>
     </div>
 </div>
 
 <div class="grid c4 mb">
-    @foreach (var (title, text, icon) in Quick)
+    @foreach (var tip in manual.Tips)
     {
-        <div class="card"><div class="row"><Icon Name="@icon" /><b>@title</b></div><div class="small muted mt-s">@text</div></div>
+        <div class="card"><div class="row"><Icon Name="@tip.Icon" /><b>@tip.Title</b></div><div class="small muted mt-s">@tip.Text</div></div>
     }
 </div>
 
 <div class="card pad-0" style="height:78vh">
-    <iframe src="@PdfUrl#toolbar=1&view=FitH" title="Qo'llanma" style="width:100%;height:100%;border:none"></iframe>
+    <iframe src="@pdfUrl#toolbar=1&view=FitH" title="Qo'llanma" style="width:100%;height:100%;border:none"></iframe>
 </div>
 
 @code {
-    private string Slug = "student";
-    private string Intro = "";
-    private (string, string, string)[] Quick = [];
+    private Manual manual = null!;
+    private string slug = "", pdfUrl = "";
 
     protected override async Task OnInitializedAsync()
     {
         SetTitle("Qo'llanma");
-        (Slug, Intro, Quick) = (await Me.RoleAsync()) switch
-        {
-            UserRole.Admin or UserRole.SuperAdmin => ("admin",
-                "Administrator qo'llanmasi: savollar banki, test builder, o'quvchilar, xodimlar, guruhlar, materiallar, sozlamalar, audit, Telegram bot.",
-                new (string, string, string)[]
-                {
-                    ("Savollar banki", "Savol qo'shing, Faol holatga o'tkazing (izoh majburiy). Matn o'zgarsa yangi versiya yaratiladi.", "database"),
-                    ("Test builder", "Modullarga savol qo'shing yoki avto-generatsiya qiling, Preview qiling va Chop eting.", "tests"),
-                    ("Hisoblar", "O'qituvchi, assistent va admin hisoblarini faqat siz yaratasiz (Xodimlar va ota-onalar).", "user"),
-                    ("Sozlamalar", "Scoring jadvali, adaptiv qoidalar, modul vaqtlari va mustaqil ro'yxatdan o'tish.", "settings"),
-                }),
-            UserRole.Teacher or UserRole.Assistant => ("teacher",
-                "O'qituvchi va assistent qo'llanmasi: guruhlar, o'quvchilar, davomat, test tayinlash, uy vazifasi, tahlil.",
-                new (string, string, string)[]
-                {
-                    ("Davomat", "Guruh va sanani tanlang, belgilang va saqlang — kelmagan o'quvchining ota-onasiga Telegram xabar boradi.", "calendar"),
-                    ("Test tayinlash", "Chop etilgan testni guruh yoki o'quvchiga muddat va urinishlar soni bilan tayinlang.", "tests"),
-                    ("Uy vazifasi", "Mashq, test yoki fayl turida vazifa bering va topshirilganlarni baholang.", "clipboard"),
-                    ("Zaif o'quvchilar", "Bosh sahifa e'tibor talab qiladigan o'quvchilarni ko'rsatadi.", "chart"),
-                }),
-            UserRole.Parent => ("parent",
-                "Ota-ona qo'llanmasi: farzandingizning ballari, testlari, davomati va zaif mavzularini qanday ko'rish.",
-                new (string, string, string)[]
-                {
-                    ("Farzandim", "Joriy ball, maqsad, aniqlik, davomat va ball dinamikasi bir sahifada.", "home"),
-                    ("Farzand qo'shish", "Profil → «Farzandni bog'lash» orqali o'quvchining ota-ona kodini kiriting.", "user"),
-                    ("Davomat", "Farzandingiz darsga kelmasa yoki kechiksa Telegramga xabar keladi.", "calendar"),
-                    ("Telegram bot", "@sat_notificationbot: /start — hisobni bog'lash, /login — parolsiz kirish havolasi.", "telegram"),
-                }),
-            _ => ("student",
-                "O'quvchi qo'llanmasi: kirish, testlar, test oynasi, mashq, xatolar, tahlil, materiallar, uy vazifasi, Telegram bot.",
-                new (string, string, string)[]
-                {
-                    ("Birinchi qadam", "Diagnostik testni ishlang — tizim zaif mavzularingizni aniqlab, har kuni nimani mashq qilishni aytadi.", "play"),
-                    ("Test oynasi", "A/B/C/D tugmalari — javob, F — belgilash, G — savollar jadvali, ← → — oldingi/keyingi savol.", "tests"),
-                    ("Internet uzilsa", "Javoblar brauzerda saqlanadi va ulanish qaytgach yuboriladi. Taymer serverda davom etadi.", "zap"),
-                    ("Telegram bot", "@sat_notificationbot: /start — hisobni bog'lash, /login — parolsiz kirish havolasi.", "telegram"),
-                }),
-        };
+        var role = await Me.RoleAsync();
+        (manual, slug, pdfUrl) = (PageHelp.ManualFor(role), PageHelp.Slug(role), PageHelp.PdfUrl(role));
     }
-
-    private string PdfUrl => $"/qollanma-{Slug}.pdf";
 }

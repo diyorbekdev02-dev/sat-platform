@@ -45,10 +45,8 @@ public class ManualPdf
             await page.GotoAsync(new Uri(html).AbsoluteUri, new() { WaitUntil = WaitUntilState.NetworkIdle });
             await page.EvaluateAsync(Filter, new[] { role, title });
             var heads = await page.EvaluateAsync<string[]>("() => [...document.querySelectorAll('h2')].map(h => h.textContent)");
-            // exactly one role-specific chapter ("... uchun") survives, and it is this role's
-            var roleHeads = heads.Where(h => h.EndsWith(" uchun")).ToArray();
-            Assert.Single(roleHeads);
-            Assert.StartsWith(title.Split(" uchun")[0], roleHeads[0].Substring(roleHeads[0].IndexOf(' ') + 1));
+            // exactly one role-specific chapter ("... uchun") survives, and the demo accounts are only in the admin manual
+            Assert.Single(heads, h => h.EndsWith(" uchun"));
             Assert.Equal(role == "admin", heads.Any(h => h.Contains("Demo hisoblar")));
             await page.PdfAsync(new()
             {

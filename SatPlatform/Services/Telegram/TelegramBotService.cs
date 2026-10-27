@@ -90,8 +90,8 @@ public class TelegramBotService(TelegramBotClient bot, AuthService auth, IDbCont
                 await bot.SendMessageAsync(u.ChatId, "Iltimos, faqat o'zingizning raqamingizni yuboring.", ContactKeyboard, ct);
                 return;
             }
-            var phone = AuthService.NormalizePhone(u.ContactPhone);
-            if (!AuthService.IsValidPhone(phone))
+            var phone = PhoneFormat.Normalize(u.ContactPhone);
+            if (!PhoneFormat.IsValid(phone))
             {
                 await bot.SendMessageAsync(u.ChatId, "⚠️ Faqat O'zbekiston raqamlari (+998) qabul qilinadi. Iltimos, O'zbekiston raqamingizni yuboring.", ContactKeyboard, ct);
                 return;

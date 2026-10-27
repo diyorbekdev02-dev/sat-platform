@@ -44,7 +44,7 @@
             <button class="icon-btn menu-btn" @onclick="() => menuOpen = !menuOpen" aria-label="Menyu"><Icon Name="menu" Size="22" /></button>
             <h1 id="page-title">@Title</h1>
             <div class="spacer"></div>
-            @if (Topic is not null)
+            @if (topic is not null)
             {
                 <button class="btn sm help-btn" @onclick="OpenHelp" title="Shu bo'lim bo'yicha qo'llanma"><Icon Name="book" Size="18" /> <span>Qo'llanma</span></button>
             }
@@ -57,32 +57,9 @@
     </div>
 </div>
 
-@if (helpOpen && Topic is HelpTopic topic)
+@if (helpOpen && topic is not null)
 {
-    <div class="help-backdrop" @onclick="CloseHelp"></div>
-    <aside id="help-drawer" class="help-drawer" tabindex="-1" role="dialog" aria-label="Qo'llanma" @onkeydown="OnHelpKey">
-        <div class="help-head">
-            <div>
-                <div class="help-kicker">Qo'llanma</div>
-                <h2>@topic.Title</h2>
-            </div>
-            <button class="icon-btn" @onclick="CloseHelp" aria-label="Yopish"><Icon Name="x" Size="20" /></button>
-        </div>
-        <div class="help-body">
-            <p class="help-intro">@topic.Intro</p>
-            @foreach (var s in topic.Sections)
-            {
-                <section class="help-section">
-                    <h3>@s.Heading</h3>
-                    <ul>@foreach (var item in s.Items) { <li>@((MarkupString)item)</li> }</ul>
-                </section>
-            }
-        </div>
-        <div class="help-foot">
-            <a class="btn sm" href="@PdfUrl" target="_blank"><Icon Name="download" Size="16" /> To'liq qo'llanma (PDF)</a>
-            <button class="btn sm primary" @onclick="CloseHelp">Tushunarli</button>
-        </div>
-    </aside>
+    <HelpDrawer Topic="topic" PdfUrl="@PageHelp.PdfUrl(role)" OnClose="CloseHelp" />
 }
 
 <div class="toast-host">
@@ -100,9 +77,8 @@
     private string name = "", roleLabel = "", initials = "", avatarColor = "#2f5bea", centerName = "SAT Center";
     private int unread, mistakes;
     private UserRole? role;
-    private bool helpOpen, focusHelp;
-    private HelpTopic? Topic => PageHelp.Find(new Uri(Nav.Uri).AbsolutePath);
-    private string PdfUrl => "/qollanma-" + (role switch { UserRole.Admin or UserRole.SuperAdmin => "admin", UserRole.Teacher or UserRole.Assistant => "teacher", UserRole.Parent => "parent", _ => "student" }) + ".pdf";
+    private bool helpOpen;
+    private HelpTopic? topic;
     private string Title => PageTitleState.Current;
     private string ContentClass => PageTitleState.Narrow ? "narrow" : "";
 
@@ -113,6 +89,7 @@
     {
         Toasts.Changed += OnToast;
         Nav.LocationChanged += OnLocation;
+        topic = FindTopic();
         PageTitleState.Changed += OnTitle;
         role = await Me.RoleAsync();
         name = await Me.NameAsync();
@@ -150,15 +127,14 @@
 
     protected override async Task OnAfterRenderAsync(bool first)
     {
-        if (focusHelp) { focusHelp = false; await JS.InvokeVoidAsync("sat.focus", "help-drawer"); }
         if (first) { dark = await JS.InvokeAsync<string>("sat.theme.get") == "dark"; await JS.InvokeVoidAsync("sat.ready"); StateHasChanged(); }
     }
 
     private async Task ToggleTheme() { dark = !dark; await JS.InvokeVoidAsync("sat.theme.set", dark ? "dark" : ""); }
-    private void OpenHelp() { helpOpen = true; focusHelp = true; }
+    private HelpTopic? FindTopic() => PageHelp.Find(Nav.ToBaseRelativePath(Nav.Uri));
+    private void OpenHelp() => helpOpen = true;
     private void CloseHelp() => helpOpen = false;
-    private void OnHelpKey(KeyboardEventArgs e) { if (e.Key == "Escape") helpOpen = false; }
-    private void OnLocation(object? s, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) { helpOpen = false; InvokeAsync(StateHasChanged); }
+    private void OnLocation(object? s, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e) { helpOpen = false; topic = FindTopic(); InvokeAsync(StateHasChanged); }
     private void OnToast() => InvokeAsync(StateHasChanged);
     private void OnTitle() => InvokeAsync(StateHasChanged);
     public void Dispose() { Toasts.Changed -= OnToast; Nav.LocationChanged -= OnLocation; PageTitleState.Changed -= OnTitle; }

@@ -31,7 +31,7 @@ else
 
     <Modal Open="createOpen" OpenChanged="v => createOpen = v" Title="Yangi o'quvchi">
         <label class="lbl">Ism-familiya</label><input class="input" @bind="nName" />
-        <label class="lbl">Telefon</label><input class="input" type="tel" inputmode="tel" maxlength="17" data-phone placeholder="+998 90 123 45 67" @bind="nPhone" />
+        <label class="lbl">Telefon</label><input class="input" type="tel" inputmode="tel" data-phone placeholder="+998 90 123 45 67" @bind="nPhone" />
         <div class="form-row"><div><label class="lbl">Parol</label><input class="input" @bind="nPassword" placeholder="kamida 6 belgi" /></div><div><label class="lbl">Maqsad ball</label><input class="input" type="number" min="400" max="1600" @bind="nTarget" /></div></div>
         <label class="lbl">Guruh (ixtiyoriy)</label><select class="input" @bind="nGroup"><option value="0">—</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select>
         <div class="hint">O'quvchi Telegram botga raqamini yuborsa, parolsiz havola orqali ham kira oladi.</div>

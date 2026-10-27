@@ -1,6 +1,10 @@
 @if (string.IsNullOrWhiteSpace(Value)) { <span class="muted">—</span> }
-else { <a class="phone-link" href="tel:@PhoneFormat.Normalize(Value)">@PhoneFormat.Display(Value)</a> }
+else { <a class="phone-link" href="tel:@tel">@shown</a> }
 
 @code {
     [Parameter] public string? Value { get; set; }
+
+    private string tel = "", shown = "";
+
+    protected override void OnParametersSet() { tel = PhoneFormat.Normalize(Value); shown = PhoneFormat.Display(tel); }
 }
