@@ -29,7 +29,7 @@ else
                     <table class="att-grid">
                         <thead>
                             <tr>
-                                <th class="num">№</th><th class="nm">Ism</th>
+                                <th class="nm">Ism</th>
                                 @for (var i = 0; i < days.Count; i++)
                                 {
                                     var d = days[i];
@@ -42,7 +42,7 @@ else
                             {
                                 var r = rows[n];
                                 <tr>
-                                    <td class="num">@(n + 1)</td><td class="nm"><b>@r.Name</b></td>
+                                    <td class="nm"><b>@r.Name</b></td>
                                     @foreach (var d in days)
                                     {
                                         AttendanceStatus? s = r.Cells.TryGetValue(d, out var v) ? v : null;
@@ -69,7 +69,6 @@ else
                     <span><i class="att-cell present">✓</i> Keldi</span><span><i class="att-cell absent">✕</i> Sababsiz</span><span><i class="att-cell late">K</i> Kechikdi</span><span><i class="att-cell excused">S</i> Sababli</span><span><i class="att-cell"></i> Belgilanmagan</span>
                 </div>
             }
-            <p class="small muted mt-s">Katakchani bosib holatni tanlang (Keldi, Kechikdi, Sababli, Sababsiz), so'ng «Saqlash» tugmasini bosing. Kelmagan yoki kechikkan o'quvchilarning ota-onasiga Telegram orqali xabar yuboriladi.</p>
         </div>
     }
 }
@@ -88,7 +87,7 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        SetTitle("Davomat", narrow: true);
+        SetTitle("Davomat");
         var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
         groups = await Academy.GroupsAsync(await Academy.GroupScopeAsync(uid, role));
         groupId = QGroup ?? (groups.FirstOrDefault(g => AcademyService.HasClassOn(g, Tz.Today))?.Id ?? groups.FirstOrDefault()?.Id ?? 0);
