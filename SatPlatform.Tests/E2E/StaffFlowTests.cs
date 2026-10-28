@@ -26,15 +26,19 @@ public class StaffFlowTests(BrowserFixture f)
         Assert.Equal(0, await page.Locator(".card:has-text('SAT Foundation B')").CountAsync());
 
         await page.GoAsync("/teacher/attendance");
-        await page.WaitForSelectorAsync(".att-row");
-        var rows = page.Locator(".att-row");
-        await rows.Nth(0).Locator("button.absent").ClickAsync();
-        await rows.Nth(1).Locator("button.late").ClickAsync();
-        await page.ClickAsync("button:has-text('Davomatni saqlash')");
+        await page.WaitForSelectorAsync(".att-grid tbody tr");
+        var rows = page.Locator(".att-grid tbody tr");
+        // cell cycle: empty -> present -> absent -> late
+        var first = rows.Nth(0).Locator("button.att-cell").Last;
+        await first.ClickAsync(); await first.ClickAsync();
+        var second = rows.Nth(1).Locator("button.att-cell").Last;
+        await second.ClickAsync(); await second.ClickAsync(); await second.ClickAsync();
+        await page.ClickAsync("button:has-text('Saqlash')");
         await page.WaitForSelectorAsync(".toast:has-text('Davomat saqlandi')");
         await page.ReloadAsync();
-        await page.WaitForSelectorAsync(".att-row");
-        Assert.Contains("on", await page.Locator(".att-row").Nth(0).Locator("button.absent").GetAttributeAsync("class"));
+        await page.WaitForSelectorAsync(".att-grid tbody tr");
+        Assert.Contains("absent", await page.Locator(".att-grid tbody tr").Nth(0).Locator("button.att-cell").Last.GetAttributeAsync("class"));
+        Assert.Contains("late", await page.Locator(".att-grid tbody tr").Nth(1).Locator("button.att-cell").Last.GetAttributeAsync("class"));
     }
 
     [Fact]

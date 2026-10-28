@@ -205,6 +205,12 @@ public class AcademyService(IDbContextFactory<AppDbContext> factory, AuditServic
         return await db.Attendances.AsNoTracking().Where(a => a.GroupId == groupId && a.Date == date).ToListAsync();
     }
 
+    public async Task<List<Attendance>> AttendanceRangeAsync(int groupId, DateOnly from, DateOnly to)
+    {
+        await using var db = await factory.CreateDbContextAsync();
+        return await db.Attendances.AsNoTracking().Where(a => a.GroupId == groupId && a.Date >= from && a.Date <= to).ToListAsync();
+    }
+
     public async Task SaveAttendanceAsync(int groupId, DateOnly date, IEnumerable<(int StudentId, AttendanceStatus Status, int LateMinutes)> rows, int userId)
     {
         await using var db = await factory.CreateDbContextAsync();

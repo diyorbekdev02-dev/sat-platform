@@ -412,3 +412,22 @@ select.input { appearance: auto; }
 @keyframes help-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes help-fade { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 760px) { .help-btn span { display: none; } .help-btn { padding: 0 10px; } }
+
+/* attendance month grid */
+.att-grid-wrap { overflow-x: auto; }
+.att-grid { border-collapse: collapse; width: 100%; font-size: 13px; }
+.att-grid th, .att-grid td { padding: 6px 4px; text-align: center; border-bottom: 1px solid var(--border); }
+.att-grid .num { width: 32px; color: var(--muted); text-align: left; }
+.att-grid .nm { text-align: left; white-space: nowrap; padding-right: 16px; position: sticky; left: 0; background: var(--card, var(--bg)); }
+.att-grid th { font-weight: 600; }
+.att-grid th.today { color: var(--accent); }
+.att-all { background: none; border: 0; cursor: pointer; font: inherit; color: inherit; line-height: 1.3; }
+.att-all .lesson { display: block; font-size: 11px; color: var(--accent); }
+.att-cell { width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border); background: var(--bg); font-size: 12px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-style: normal; }
+.att-cell.present { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
+.att-cell.absent { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+.att-cell.late { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.att-cell.excused { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.att-cell.dirty { box-shadow: 0 0 0 2px var(--accent-soft); }
+.att-legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.att-legend .att-cell { cursor: default; width: 20px; height: 20px; font-size: 11px; margin-right: 4px; }
