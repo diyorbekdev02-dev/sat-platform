@@ -1,4 +1,4 @@
-using Microsoft.Playwright;
+﻿using Microsoft.Playwright;
 using Xunit;
 
 namespace SatPlatform.Tests.E2E;
@@ -28,11 +28,11 @@ public class StaffFlowTests(BrowserFixture f)
         await page.GoAsync("/teacher/attendance");
         await page.WaitForSelectorAsync(".att-grid tbody tr");
         var rows = page.Locator(".att-grid tbody tr");
-        // cell cycle: empty -> present -> absent -> late
+        // click a cell, pick a status from the popup
         var first = rows.Nth(0).Locator("button.att-cell").Last;
-        await first.ClickAsync(); await first.ClickAsync();
+        await first.ClickAsync(); await page.ClickAsync(".att-menu button:has-text('Sababsiz')");
         var second = rows.Nth(1).Locator("button.att-cell").Last;
-        await second.ClickAsync(); await second.ClickAsync(); await second.ClickAsync();
+        await second.ClickAsync(); await page.ClickAsync(".att-menu button:has-text('Kechikdi')");
         await page.ClickAsync("button:has-text('Saqlash')");
         await page.WaitForSelectorAsync(".toast:has-text('Davomat saqlandi')");
         await page.ReloadAsync();
@@ -168,3 +168,4 @@ public class StaffFlowTests(BrowserFixture f)
         await page.WaitForSelectorAsync("text=Xush kelibsiz, E2E");
     }
 }
+

@@ -46,7 +46,19 @@ else
                                     @foreach (var d in days)
                                     {
                                         AttendanceStatus? s = r.Cells.TryGetValue(d, out var v) ? v : null;
-                                        <td><button class="att-cell @Css(s) @(dirty.Contains((r.StudentId, d)) ? "dirty" : "")" title="@Label(s)" @onclick="() => Cycle(r, d)">@Glyph(s)</button></td>
+                                        <td class="att-td">
+                                            <button class="att-cell @Css(s) @(dirty.Contains((r.StudentId, d)) ? "dirty" : "")" title="@Label(s)" @onclick="() => Toggle(r.StudentId, d)">@Glyph(s)</button>
+                                            @if (open == (r.StudentId, d))
+                                            {
+                                                <div class="att-backdrop" @onclick="() => open = null"></div>
+                                                <div class="att-menu @(n >= rows.Count - 2 && rows.Count > 3 ? "up" : "")">
+                                                    @foreach (var o in Order)
+                                                    {
+                                                        <button class="@(s == o ? "sel" : "")" @onclick="() => Pick(r, d, o)"><i class="att-dot @Css(o)"></i>@Label(o)</button>
+                                                    }
+                                                </div>
+                                            }
+                                        </td>
                                     }
                                 </tr>
                             }
@@ -54,10 +66,10 @@ else
                     </table>
                 </div>
                 <div class="att-legend small muted mt-s">
-                    <span><i class="att-cell present">✓</i> Keldi</span><span><i class="att-cell absent">✕</i> Kelmadi</span><span><i class="att-cell late">K</i> Kechikdi</span><span><i class="att-cell excused">S</i> Sababli</span><span><i class="att-cell"></i> Belgilanmagan</span>
+                    <span><i class="att-cell present">✓</i> Keldi</span><span><i class="att-cell absent">✕</i> Sababsiz</span><span><i class="att-cell late">K</i> Kechikdi</span><span><i class="att-cell excused">S</i> Sababli</span><span><i class="att-cell"></i> Belgilanmagan</span>
                 </div>
             }
-            <p class="small muted mt-s">Katakchani bosib holatni almashtiring, so'ng «Saqlash» tugmasini bosing. Kelmagan yoki kechikkan o'quvchilarning ota-onasiga Telegram orqali xabar yuboriladi.</p>
+            <p class="small muted mt-s">Katakchani bosib holatni tanlang (Keldi, Kechikdi, Sababli, Sababsiz), so'ng «Saqlash» tugmasini bosing. Kelmagan yoki kechikkan o'quvchilarning ota-onasiga Telegram orqali xabar yuboriladi.</p>
         </div>
     }
 }
@@ -109,10 +121,14 @@ else
 
     private static readonly AttendanceStatus[] Order = [AttendanceStatus.Present, AttendanceStatus.Absent, AttendanceStatus.Late, AttendanceStatus.Excused];
 
-    private void Cycle(Row r, DateOnly d)
+    private (int, DateOnly)? open;
+
+    private void Toggle(int studentId, DateOnly d) => open = open == (studentId, d) ? null : (studentId, d);
+
+    private void Pick(Row r, DateOnly d, AttendanceStatus s)
     {
-        r.Cells[d] = r.Cells.TryGetValue(d, out var s) ? Order[(Array.IndexOf(Order, s) + 1) % Order.Length] : AttendanceStatus.Present;
-        dirty.Add((r.StudentId, d));
+        if (!r.Cells.TryGetValue(d, out var cur) || cur != s) { r.Cells[d] = s; dirty.Add((r.StudentId, d)); }
+        open = null;
     }
 
     private void SetDay(DateOnly d) { foreach (var r in rows) { r.Cells[d] = AttendanceStatus.Present; dirty.Add((r.StudentId, d)); } }
@@ -133,5 +149,5 @@ else
 
     private static string Css(AttendanceStatus? s) => s switch { AttendanceStatus.Present => "present", AttendanceStatus.Absent => "absent", AttendanceStatus.Late => "late", AttendanceStatus.Excused => "excused", _ => "" };
     private static string Glyph(AttendanceStatus? s) => s switch { AttendanceStatus.Present => "✓", AttendanceStatus.Absent => "✕", AttendanceStatus.Late => "K", AttendanceStatus.Excused => "S", _ => "" };
-    private static string Label(AttendanceStatus? s) => s switch { AttendanceStatus.Present => "Keldi", AttendanceStatus.Absent => "Kelmadi", AttendanceStatus.Late => "Kechikdi", AttendanceStatus.Excused => "Sababli", _ => "Belgilanmagan" };
+    private static string Label(AttendanceStatus? s) => s switch { AttendanceStatus.Present => "Keldi", AttendanceStatus.Absent => "Sababsiz", AttendanceStatus.Late => "Kechikdi", AttendanceStatus.Excused => "Sababli", _ => "Belgilanmagan" };
 }

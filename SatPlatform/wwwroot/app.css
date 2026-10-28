@@ -431,3 +431,11 @@ select.input { appearance: auto; }
 .att-cell.dirty { box-shadow: 0 0 0 2px var(--accent-soft); }
 .att-legend { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
 .att-legend .att-cell { cursor: default; width: 20px; height: 20px; font-size: 11px; margin-right: 4px; }
+.att-td { position: relative; }
+.att-backdrop { position: fixed; inset: 0; z-index: 30; }
+.att-menu { position: absolute; z-index: 31; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 4px; min-width: 150px; background: var(--card, var(--bg)); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 6px; text-align: left; }
+.att-menu.up { top: auto; bottom: 100%; margin-top: 0; margin-bottom: 4px; }
+.att-menu button { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; background: none; border-radius: 6px; font: inherit; font-size: 13px; cursor: pointer; color: inherit; }
+.att-menu button:hover, .att-menu button.sel { background: var(--accent-soft); }
+.att-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; background: var(--border); }
+.att-dot.present { background: var(--ok); } .att-dot.absent { background: var(--danger); } .att-dot.late { background: var(--warn); } .att-dot.excused { background: var(--accent); }
