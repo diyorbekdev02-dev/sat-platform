@@ -484,3 +484,4 @@ select.input { appearance: auto; }
 .tl-block:hover { box-shadow: 0 2px 10px rgba(0,0,0,.18); z-index: 1; }
 .tl-block b { color: var(--sc); font-size: 13px; }
 .tl-block span { color: var(--muted); }
+.tl-col.addable { cursor: cell; } .tl-col.addable:hover { background-color: var(--hover); }

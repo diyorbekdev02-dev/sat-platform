@@ -189,6 +189,14 @@ public class CrmPagesTests(BrowserFixture f)
         await page.WaitForSelectorAsync(".chip.active:has-text('Ota-ona')");
         await page.GoAsync("/teacher/schedule");
         await page.WaitForSelectorAsync(".tl-block");
+        // admin can add a lesson from the schedule: picking a group fills its room/time/days, saving keeps them
+        await page.ClickAsync("button:has-text('Dars qo')");
+        await page.SelectOptionAsync(".modal select", new SelectOptionValue { Label = "SAT Foundation B" });
+        Assert.Equal("202", await page.InputValueAsync(".modal input[list=rooms]"));
+        await page.ClickAsync(".modal button.primary");
+        await page.WaitForSelectorAsync(".toast:has-text('Jadval saqlandi')");
+        await page.ClickAsync("button:text-is(\"Ro'yxat\")");
+        await page.WaitForSelectorAsync("tr:has-text('SAT Foundation B')");
 
         // lead
         await page.GoAsync("/admin/leads");

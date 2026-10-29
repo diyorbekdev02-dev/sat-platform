@@ -15,10 +15,12 @@ else
                 <button class="chip @(day == 0 ? "active" : "")" @onclick="() => day = 0">Hafta</button>
             </div>
             <div class="row">
-                @if (day != 0)
+                @if (day != 0 && !listView)
                 {
                     <div class="seg"><button class="@(byTeacher ? "" : "on")" @onclick="() => byTeacher = false">Xonalar</button><button class="@(byTeacher ? "on" : "")" @onclick="() => byTeacher = true">O'qituvchilar</button></div>
                 }
+                @if (isAdmin) { <button class="btn primary sm" @onclick="() => Add(null, 0, null)"><Icon Name="plus" Size="16" /> Dars qo'shish</button> }
+                <div class="seg"><button class="@(listView ? "" : "on")" @onclick="() => listView = false">Jadval</button><button class="@(listView ? "on" : "")" @onclick="() => listView = true">Ro'yxat</button></div>
                 <button class="btn sm" @onclick="ExportAsync"><Icon Name="download" Size="16" /> Export</button>
             </div>
         </div>
@@ -33,6 +35,15 @@ else
     {
         <div class="card"><div class="empty"><h3>Jadvalda dars yo'q</h3><p class="small">Guruhlarga dars kunlari va vaqti kiritilmagan yoki filtrga mos guruh yo'q.</p></div></div>
     }
+    else if (listView)
+    {
+        <div class="card pad-0"><div class="table-wrap"><table class="table">
+            <thead><tr><th class="no">№</th><th>Xona</th><th>Kunlar</th><th>Vaqt</th><th>Guruh</th><th>O'qituvchi</th><th class="num">O'quvchilar</th>@if (isAdmin) { <th></th> }</tr></thead>
+            <tbody>@foreach (var (g, n) in Visible.OrderBy(g => g.Room).ThenBy(g => g.StartTime).Select((g, i) => (g, i + 1)))
+            {
+                <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/groups/{g.Id}"))"><td class="no">@n</td><td class="bold">@(string.IsNullOrWhiteSpace(g.Room) ? "—" : g.Room + "-xona")</td><td>@Labels.Days(g.ScheduleDays)</td><td>@g.StartTime?.ToString("HH:mm")–@g.EndTime?.ToString("HH:mm")</td><td>@g.Name</td><td>@(g.TeacherUser?.FullName ?? "—")</td><td class="num">@g.Enrollments.Count</td>@if (isAdmin) { <td><button class="btn sm" @onclick="() => Add(g, 0, null)" @onclick:stopPropagation="true"><Icon Name="pencil" Size="14" /></button></td> }</tr>
+            }</tbody></table></div></div>
+    }
     else
     {
         var cols = Cols;
@@ -44,12 +55,12 @@ else
                 <div class="tl-times" style="height:@((to - from) * Hour)px">@for (var h = from; h < to; h++) { <div style="height:@(Hour)px">@($"{h:00}:00")</div> }</div>
                 @foreach (var c in cols)
                 {
-                    <div class="tl-col" style="height:@((to - from) * Hour)px">
+                    <div class="tl-col @(isAdmin ? "addable" : "")" style="height:@((to - from) * Hour)px" @onclick="e => Add(null, from * 60 + (int)(e.OffsetY / Hour) * 60, c)">
                         @foreach (var (g, lane, lanes) in Layout(c.Items))
                         {
                             var top = ((g.StartTime!.Value.ToTimeSpan().TotalMinutes) - from * 60) / 60.0 * Hour;
                             var height = Math.Max(30, (g.EndTime!.Value.ToTimeSpan() - g.StartTime!.Value.ToTimeSpan()).TotalMinutes / 60.0 * Hour - 3);
-                            <a class="tl-block" href="/teacher/groups/@g.Id" style="top:@(top.ToString("0.#", Inv))px;height:@(height.ToString("0.#", Inv))px;left:@((100.0 * lane / lanes).ToString("0.#", Inv))%;width:@((100.0 / lanes).ToString("0.#", Inv))%;@Color(g)">
+                            <a class="tl-block" href="/teacher/groups/@g.Id" @onclick="() => Add(g, 0, null)" @onclick:preventDefault="isAdmin" @onclick:stopPropagation="true" style="top:@(top.ToString("0.#", Inv))px;height:@(height.ToString("0.#", Inv))px;left:@((100.0 * lane / lanes).ToString("0.#", Inv))%;width:@((100.0 / lanes).ToString("0.#", Inv))%;@Color(g)">
                                 <b>@g.Name</b>
                                 <span>@g.StartTime?.ToString("HH:mm")–@g.EndTime?.ToString("HH:mm")</span>
                                 @if (height > 60) { <span>@Detail(g)</span> }
@@ -61,9 +72,98 @@ else
             </div>
         </div>
     }
+
+    <Modal Open="editing is not null" OpenChanged="v => { if (!v) editing = null; }" Title="@(editing?.ScheduleDays.Length > 0 && editing.StartTime is not null && wasScheduled ? "Darsni tahrirlash" : "Dars qo'shish")">
+        @if (editing is not null)
+        {
+            <label class="lbl">Guruh</label>
+            <select class="input" value="@editing.Id" @onchange="OnPickGroup"><option value="0">— guruhni tanlang —</option>@foreach (var g in groups.OrderBy(g => g.Name)) { <option value="@g.Id">@g.Name</option> }</select>
+            <div class="form-row">
+                <div><label class="lbl">Xona</label><input class="input" @bind="editing.Room" list="rooms" placeholder="201" /><datalist id="rooms">@foreach (var r in groups.Select(g => g.Room).Where(r => !string.IsNullOrWhiteSpace(r)).Distinct().Order()) { <option value="@r" /> }</datalist></div>
+                <div><label class="lbl">Boshlanish</label><input class="input" type="time" @bind="editing.StartTime" /></div>
+                <div><label class="lbl">Tugash</label><input class="input" type="time" @bind="editing.EndTime" /></div>
+            </div>
+            <label class="lbl">Dars kunlari</label>
+            <div class="chips">@foreach (var (num, label) in WeekDays) { var d = num; <button class="chip @(editDays.Contains(d) ? "active" : "")" @onclick="() => { if (!editDays.Remove(d)) editDays.Add(d); }">@label</button> }</div>
+            @if (Error is not null) { <div class="alert danger mt">@Error</div> }
+            <div class="modal-actions">
+                @if (editing.Id > 0) { <a class="btn" href="/teacher/groups/@editing.Id">Guruh sahifasi</a> }
+                @if (wasScheduled) { <button class="btn danger" @onclick="ClearAsync" disabled="@busy">Jadvaldan olib tashlash</button> }
+                <button class="btn" @onclick="() => editing = null">Bekor</button><button class="btn primary" @onclick="SaveAsync" disabled="@busy">Saqlash</button>
+            </div>
+        }
+    </Modal>
 }
 
 @code {
+    private bool isAdmin, listView, busy, wasScheduled;
+    private Group? editing;
+    private readonly HashSet<int> editDays = [];
+
+    /// <summary>Opens the lesson form: an existing group (edit), or a new lesson prefilled from the clicked column and hour.</summary>
+    private void Add(Group? g, int startMinutes, Col? col)
+    {
+        if (!isAdmin) return;
+        Error = null;
+        wasScheduled = g is { StartTime: not null, ScheduleDays.Length: > 0 };
+        editDays.Clear();
+        if (g is not null)
+        {
+            editing = new Group { Id = g.Id, Name = g.Name, CourseType = g.CourseType, TeacherUserId = g.TeacherUserId, AssistantUserId = g.AssistantUserId, IsActive = g.IsActive, Room = g.Room, StartTime = g.StartTime, EndTime = g.EndTime, ScheduleDays = g.ScheduleDays };
+            foreach (var d in g.ScheduleDays.Split(',', StringSplitOptions.RemoveEmptyEntries)) if (int.TryParse(d, out var n)) editDays.Add(n);
+            return;
+        }
+        editing = new Group { IsActive = true };
+        if (startMinutes > 0) { editing.StartTime = TimeOnly.FromTimeSpan(TimeSpan.FromMinutes(startMinutes)); editing.EndTime = editing.StartTime.Value.AddHours(1); }
+        if (col is not null && !byTeacher && day != 0 && col.Title.EndsWith("-xona")) editing.Room = col.Title[..^5];
+        editDays.Add(day == 0 ? Today : day);
+    }
+
+    private void OnPickGroup(ChangeEventArgs e)
+    {
+        var id = int.TryParse(e.Value?.ToString(), out var n) ? n : 0;
+        var g = groups.FirstOrDefault(x => x.Id == id);
+        if (g is null) { editing!.Id = 0; return; }
+        // keep what was typed in the form; adopt the group's identity and any schedule fields still empty
+        var keepRoom = editing!.Room; var keepStart = editing.StartTime; var keepEnd = editing.EndTime;
+        editing = new Group { Id = g.Id, Name = g.Name, CourseType = g.CourseType, TeacherUserId = g.TeacherUserId, AssistantUserId = g.AssistantUserId, IsActive = g.IsActive,
+            Room = string.IsNullOrWhiteSpace(keepRoom) ? g.Room : keepRoom, StartTime = keepStart ?? g.StartTime, EndTime = keepEnd ?? g.EndTime, ScheduleDays = g.ScheduleDays };
+        wasScheduled = g.StartTime is not null && g.ScheduleDays.Length > 0;
+        if (editDays.Count == 0 || wasScheduled) { editDays.Clear(); foreach (var d in g.ScheduleDays.Split(',', StringSplitOptions.RemoveEmptyEntries)) if (int.TryParse(d, out var x)) editDays.Add(x); if (editDays.Count == 0) editDays.Add(day == 0 ? Today : day); }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (editing is null || editing.Id == 0) { Error = "Guruhni tanlang."; return; }
+        if (string.IsNullOrWhiteSpace(editing.Room)) { Error = "Xonani kiriting."; return; }
+        if (editing.StartTime is null || editing.EndTime is null) { Error = "Boshlanish va tugash vaqtini kiriting."; return; }
+        if (editDays.Count == 0) { Error = "Kamida bitta dars kunini tanlang."; return; }
+        busy = true; Error = null;
+        editing.Room = editing.Room.Trim();
+        editing.ScheduleDays = string.Join(",", editDays.Order());
+        var (_, err) = await Academy.SaveGroupAsync(editing, await Me.IdAsync());
+        busy = false;
+        if (err is not null) { Error = err; return; }
+        editing = null; await ReloadAsync(); Toasts.Ok("Jadval saqlandi");
+    }
+
+    private async Task ClearAsync()
+    {
+        if (editing is null || !await ConfirmAsync("Bu guruhni dars jadvalidan olib tashlaysizmi?")) return;
+        busy = true;
+        editing.ScheduleDays = ""; editing.StartTime = null; editing.EndTime = null; editing.Room = null;
+        var (_, err) = await Academy.SaveGroupAsync(editing, await Me.IdAsync());
+        busy = false;
+        if (err is not null) { Error = err; return; }
+        editing = null; await ReloadAsync(); Toasts.Ok("Jadvaldan olib tashlandi");
+    }
+
+    private async Task ReloadAsync()
+    {
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        groups = await Academy.GroupsAsync(await Academy.GroupScopeAsync(uid, role));
+    }
+
     private record Col(string Title, string? Sub, bool Today, List<Group> Items);
 
     private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
@@ -126,8 +226,8 @@ else
     protected override async Task OnInitializedAsync()
     {
         SetTitle("Dars jadvali");
-        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
-        groups = await Academy.GroupsAsync(await Academy.GroupScopeAsync(uid, role));
+        isAdmin = (await Me.RoleAsync()) is UserRole.Admin or UserRole.SuperAdmin;
+        await ReloadAsync();
         Loading = false;
     }
 }
