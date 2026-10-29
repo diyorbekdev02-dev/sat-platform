@@ -1,0 +1,97 @@
+@page "/tasks"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject CrmService Crm
+@inject AcademyService Academy
+
+<PageTitle>Topshiriqlar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="row between mb"><h2 class="grow">Topshiriqlar</h2><button class="btn primary" @onclick="() => Edit(new StaffTask())"><Icon Name="plus" /> Topshiriq qo'shish</button></div>
+    <div class="filters">
+        <input class="input sm" placeholder="Qidiruv" @bind="search" @bind:event="oninput" />
+        <select class="input sm" @bind="status"><option value="">Barcha holatlar</option><option value="Open">Bajarilmagan</option><option value="Done">Bajarilgan</option></select>
+        @if (isAdmin) { <select class="input sm" @bind="assignee"><option value="">Barcha xodimlar</option>@foreach (var u in staff) { <option value="@u.Id">@u.FullName</option> }</select> }
+    </div>
+    <div class="card pad-0">
+        <div class="list-head"><span class="count-pill">Umumiy soni: <b>@Filtered.Count()</b></span></div>
+        <div class="table-wrap"><table class="table">
+            <thead><tr><th class="no">№</th><th></th><th>Topshiriq</th><th>Mas'ul</th><th>Muddat</th><th>Holat</th></tr></thead>
+            <tbody>@foreach (var (t, n) in Filtered.Select((t, i) => (t, i + 1)))
+            {
+                <tr class="click" @onclick="() => Edit(t)">
+                    <td class="no">@n</td>
+                    <td @onclick:stopPropagation="true"><input type="checkbox" checked="@(t.Status == StaffTaskStatus.Done)" @onchange="e => ToggleAsync(t, (bool)e.Value!)" /></td>
+                    <td class="bold @(t.Status == StaffTaskStatus.Done ? "muted" : "")">@t.Title<div class="tiny muted">@t.Description</div></td>
+                    <td>@(t.AssigneeUser?.FullName ?? "—")</td>
+                    <td class="@(t.Status == StaffTaskStatus.Open && t.DueDate < Tz.Today ? "level-weak" : "")">@(t.DueDate?.ToString("dd.MM.yyyy") ?? "—")</td>
+                    <td><span class="badge @(t.Status == StaffTaskStatus.Done ? "ok" : "")">@(t.Status == StaffTaskStatus.Done ? "Bajarilgan" : "Bajarilmagan")</span></td>
+                </tr>
+            }</tbody></table></div>
+        @if (!Filtered.Any()) { <div class="empty"><h3>Topshiriqlar yo'q</h3></div> }
+    </div>
+
+    <Modal Open="editing is not null" OpenChanged="v => { if (!v) editing = null; }" Title="@(editing?.Id > 0 ? "Topshiriqni tahrirlash" : "Yangi topshiriq")">
+        @if (editing is not null)
+        {
+            <label class="lbl">Sarlavha</label><input class="input" @bind="editing.Title" />
+            <label class="lbl">Tavsif</label><textarea class="input" rows="3" @bind="editing.Description"></textarea>
+            <div class="form-row">
+                <div><label class="lbl">Mas'ul</label><select class="input" @bind="editing.AssigneeUserId"><option value="">—</option>@foreach (var u in staff) { <option value="@u.Id">@u.FullName</option> }</select></div>
+                <div><label class="lbl">Muddat</label><input class="input" type="date" @bind="editing.DueDate" /></div>
+            </div>
+            @if (Error is not null) { <div class="error">@Error</div> }
+            <div class="modal-actions">
+                @if (editing.Id > 0) { <button class="btn danger" @onclick="DeleteAsync">O'chirish</button> }
+                <button class="btn" @onclick="() => editing = null">Bekor</button><button class="btn primary" @onclick="SaveAsync">Saqlash</button>
+            </div>
+        }
+    </Modal>
+}
+
+@code {
+    private List<StaffTask> tasks = [];
+    private List<UserRow> staff = [];
+    private StaffTask? editing;
+    private bool isAdmin;
+    private int uid;
+    private string search = "", status = "", assignee = "";
+
+    private IEnumerable<StaffTask> Filtered => tasks.Where(t =>
+        (string.IsNullOrWhiteSpace(search) || t.Title.Contains(search, StringComparison.OrdinalIgnoreCase)) &&
+        (status == "" || t.Status.ToString() == status) && (assignee == "" || t.AssigneeUserId.ToString() == assignee));
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Topshiriqlar");
+        uid = await Me.IdAsync();
+        var role = (await Me.RoleAsync())!.Value;
+        isAdmin = role is UserRole.Admin or UserRole.SuperAdmin;
+        staff = (await Academy.UsersAsync(includeInactive: false)).Where(u => u.Role is UserRole.Admin or UserRole.SuperAdmin or UserRole.Teacher or UserRole.Assistant).ToList();
+        if (!isAdmin) staff = staff.Where(u => u.Id == uid).ToList();
+        await ReloadAsync();
+        Loading = false;
+    }
+
+    private async Task ReloadAsync() => tasks = await Crm.TasksAsync(uid, isAdmin);
+
+    private void Edit(StaffTask t) { Error = null; editing = new StaffTask { Id = t.Id, Title = t.Title, Description = t.Description, AssigneeUserId = t.Id == 0 ? uid : t.AssigneeUserId, DueDate = t.DueDate, Status = t.Status }; }
+
+    private async Task SaveAsync()
+    {
+        Error = await Crm.SaveTaskAsync(editing!, uid);
+        if (Error is not null) return;
+        editing = null; await ReloadAsync(); Toasts.Ok("Saqlandi");
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (!await ConfirmAsync("Topshiriqni o'chirasizmi?")) return;
+        await Crm.DeleteTaskAsync(editing!.Id);
+        editing = null; await ReloadAsync();
+    }
+
+    private async Task ToggleAsync(StaffTask t, bool done) { await Crm.SetTaskDoneAsync(t.Id, done); await ReloadAsync(); }
+}

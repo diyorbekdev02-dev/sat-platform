@@ -1,0 +1,116 @@
+@page "/admin/leads"
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inherits AppPage
+@inject CrmService Crm
+@inject AcademyService Academy
+
+<PageTitle>Lidlar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="row between mb">
+        <div class="chips">
+            <button class="chip @(!board ? "active" : "")" @onclick="() => board = false">Ro'yxat</button>
+            <button class="chip @(board ? "active" : "")" @onclick="() => board = true">Taxta</button>
+        </div>
+        <div class="row"><button class="btn" @onclick="ExportAsync"><Icon Name="download" /> Export</button><button class="btn primary" @onclick="() => Edit(new Lead())"><Icon Name="plus" /> Lid qo'shish</button></div>
+    </div>
+    <div class="filters">
+        <input class="input sm" placeholder="Qidiruv (ism yoki telefon)" @bind="search" @bind:event="oninput" />
+        <select class="input sm" @bind="status"><option value="">Barcha holatlar</option>@foreach (var s in Enum.GetValues<LeadStatus>()) { <option value="@s">@Labels.LeadStatus(s)</option> }</select>
+        <select class="input sm" @bind="source"><option value="">Barcha manbalar</option>@foreach (var s in leads.Select(l => l.Source).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Order()) { <option value="@s">@s</option> }</select>
+        <select class="input sm" @bind="moderator"><option value="">Barcha moderatorlar</option>@foreach (var m in leads.Where(l => l.ModeratorUser is not null).Select(l => l.ModeratorUser!).DistinctBy(u => u.Id)) { <option value="@m.Id">@m.FullName</option> }</select>
+    </div>
+
+    @if (!board)
+    {
+        <div class="card pad-0">
+            <div class="list-head"><span class="count-pill">Umumiy soni: <b>@Filtered.Count()</b></span></div>
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th class="no">№</th><th>Ism</th><th>Telefon</th><th>Kurs</th><th>Manba</th><th>Holat</th><th>Moderator</th><th>Yaratilgan</th></tr></thead>
+                <tbody>@foreach (var (l, n) in Filtered.Select((l, i) => (l, i + 1)))
+                {
+                    <tr class="click" @onclick="() => Edit(l)"><td class="no">@n</td><td class="bold">@l.FullName</td><td><PhoneLink Value="@l.Phone" /></td><td>@(l.Course ?? "—")</td><td>@(l.Source ?? "—")</td><td><span class="badge @Badge(l.Status)">@Labels.LeadStatus(l.Status)</span></td><td>@(l.ModeratorUser?.FullName ?? "—")</td><td>@Tz.Fmt(l.CreatedAt)</td></tr>
+                }</tbody></table></div>
+            @if (!Filtered.Any()) { <div class="empty"><h3>Lidlar topilmadi</h3></div> }
+        </div>
+    }
+    else
+    {
+        <div class="kanban">
+            @foreach (var s in Enum.GetValues<LeadStatus>())
+            {
+                <div class="kcol">
+                    <div class="khead">@Labels.LeadStatus(s) <span class="count-pill"><b>@Filtered.Count(l => l.Status == s)</b></span></div>
+                    @foreach (var l in Filtered.Where(l => l.Status == s))
+                    {
+                        <div class="kcard" @onclick="() => Edit(l)"><b>@l.FullName</b><div class="small muted">@PhoneFormat.Display(l.Phone)</div><div class="tiny muted">@(l.Course ?? "") @(l.Source is null ? "" : "· " + l.Source)</div></div>
+                    }
+                </div>
+            }
+        </div>
+    }
+
+    <Modal Open="editing is not null" OpenChanged="v => { if (!v) editing = null; }" Title="@(editing?.Id > 0 ? "Lidni tahrirlash" : "Yangi lid")">
+        @if (editing is not null)
+        {
+            <label class="lbl">Ism-familiya</label><input class="input" @bind="editing.FullName" />
+            <label class="lbl">Telefon</label><input class="input" type="tel" inputmode="tel" data-phone placeholder="+998 90 123 45 67" @bind="editing.Phone" />
+            <div class="form-row">
+                <div><label class="lbl">Kurs</label><input class="input" @bind="editing.Course" placeholder="SAT" /></div>
+                <div><label class="lbl">Manba</label><input class="input" @bind="editing.Source" list="sources" placeholder="Instagram, Telegram…" /><datalist id="sources"><option value="Instagram" /><option value="Telegram" /><option value="Tavsiya" /><option value="Sayt" /><option value="Qo'ng'iroq" /></datalist></div>
+            </div>
+            <div class="form-row">
+                <div><label class="lbl">Holat</label><select class="input" @bind="editing.Status">@foreach (var s in Enum.GetValues<LeadStatus>()) { <option value="@s">@Labels.LeadStatus(s)</option> }</select></div>
+                <div><label class="lbl">Moderator</label><select class="input" @bind="editing.ModeratorUserId"><option value="">—</option>@foreach (var u in staff) { <option value="@u.Id">@u.FullName</option> }</select></div>
+            </div>
+            <label class="lbl">Izoh</label><textarea class="input" rows="3" @bind="editing.Notes"></textarea>
+            @if (Error is not null) { <div class="error">@Error</div> }
+            <div class="modal-actions">
+                @if (editing.Id > 0) { <button class="btn danger" @onclick="DeleteAsync">O'chirish</button> }
+                <button class="btn" @onclick="() => editing = null">Bekor</button><button class="btn primary" @onclick="SaveAsync">Saqlash</button>
+            </div>
+        }
+    </Modal>
+}
+
+@code {
+    private List<Lead> leads = [];
+    private List<UserRow> staff = [];
+    private Lead? editing;
+    private bool board;
+    private string search = "", status = "", source = "", moderator = "";
+
+    private IEnumerable<Lead> Filtered => leads.Where(l =>
+        (string.IsNullOrWhiteSpace(search) || l.FullName.Contains(search, StringComparison.OrdinalIgnoreCase) || PhoneFormat.Matches(l.Phone, search)) &&
+        (status == "" || l.Status.ToString() == status) && (source == "" || l.Source == source) && (moderator == "" || l.ModeratorUserId.ToString() == moderator));
+
+    private static string Badge(LeadStatus s) => s switch { LeadStatus.Won => "ok", LeadStatus.Lost => "danger", LeadStatus.New => "accent", _ => "" };
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Lidlar");
+        staff = (await Academy.UsersAsync(includeInactive: false)).Where(u => u.Role is UserRole.Admin or UserRole.SuperAdmin or UserRole.Teacher or UserRole.Assistant).ToList();
+        leads = await Crm.LeadsAsync();
+        Loading = false;
+    }
+
+    private void Edit(Lead l) { Error = null; editing = new Lead { Id = l.Id, FullName = l.FullName, Phone = l.Id == 0 ? "+998 " : l.Phone, Source = l.Source, Course = l.Course, Status = l.Status, ModeratorUserId = l.ModeratorUserId, Notes = l.Notes }; }
+
+    private async Task SaveAsync()
+    {
+        Error = await Crm.SaveLeadAsync(editing!, await Me.IdAsync());
+        if (Error is not null) return;
+        editing = null; leads = await Crm.LeadsAsync(); Toasts.Ok("Lid saqlandi");
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (!await ConfirmAsync("Lidni o'chirasizmi?")) return;
+        await Crm.DeleteLeadAsync(editing!.Id, await Me.IdAsync());
+        editing = null; leads = await Crm.LeadsAsync(); Toasts.Ok("Lid o'chirildi");
+    }
+
+    private async Task ExportAsync() => await JS.InvokeVoidAsync("sat.download", "lidlar.csv", CsvExport.Build(["№", "Ism", "Telefon", "Kurs", "Manba", "Holat", "Moderator", "Yaratilgan"], Filtered.Select((l, i) => new object?[] { i + 1, l.FullName, l.Phone, l.Course, l.Source, Labels.LeadStatus(l.Status), l.ModeratorUser?.FullName, Tz.Fmt(l.CreatedAt) })), "text/csv");
+}

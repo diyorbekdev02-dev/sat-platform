@@ -40,6 +40,8 @@ public class Student
     [MaxLength(500)] public string? Notes { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? OnboardedAt { get; set; }
+    /// <summary>Date the next payment is due (shown in the CRM list).</summary>
+    public DateOnly? NextPaymentDate { get; set; }
 
     public List<Enrollment> Enrollments { get; set; } = [];
     public List<ParentStudent> Parents { get; set; } = [];
@@ -588,4 +590,47 @@ public class BotState
     [MaxLength(120)] public string? FullName { get; set; }
     [MaxLength(20)] public string? ChildCode { get; set; }
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>A prospective student (CRM lead).</summary>
+public class Lead
+{
+    public int Id { get; set; }
+    [MaxLength(120)] public string FullName { get; set; } = "";
+    [MaxLength(20)] public string Phone { get; set; } = "";
+    [MaxLength(60)] public string? Source { get; set; }
+    [MaxLength(60)] public string? Course { get; set; }
+    public LeadStatus Status { get; set; } = LeadStatus.New;
+    public int? ModeratorUserId { get; set; }
+    public User? ModeratorUser { get; set; }
+    [MaxLength(500)] public string? Notes { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Money movement on a student's balance: positive = payment received, negative = charge (e.g. monthly fee).</summary>
+public class Payment
+{
+    public int Id { get; set; }
+    public int StudentId { get; set; }
+    public Student Student { get; set; } = null!;
+    public decimal Amount { get; set; }
+    public PaymentMethod Method { get; set; }
+    public DateOnly Date { get; set; }
+    [MaxLength(200)] public string? Note { get; set; }
+    public int? CreatedByUserId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Internal staff task ("Topshiriqlar").</summary>
+public class StaffTask
+{
+    public int Id { get; set; }
+    [MaxLength(200)] public string Title { get; set; } = "";
+    [MaxLength(1000)] public string? Description { get; set; }
+    public int? AssigneeUserId { get; set; }
+    public User? AssigneeUser { get; set; }
+    public DateOnly? DueDate { get; set; }
+    public StaffTaskStatus Status { get; set; }
+    public int? CreatedByUserId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

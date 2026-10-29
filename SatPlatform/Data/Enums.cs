@@ -38,3 +38,9 @@ public enum SubmissionStatus { NotStarted = 0, InProgress = 1, Submitted = 2, Re
 public enum NotificationType { TestResult = 0, Attendance = 1, Homework = 2, PracticeReminder = 3, System = 4, Assignment = 5 }
 
 public enum MaterialCategory { RW = 0, Math = 1, Grammar = 2, Vocabulary = 3, Practice = 4, Other = 5 }
+
+public enum LeadStatus { New = 0, Contacted = 1, Trial = 2, Won = 3, Lost = 4 }
+
+public enum PaymentMethod { Cash = 0, Card = 1, Transfer = 2, Charge = 3 }
+
+public enum StaffTaskStatus { Open = 0, Done = 1 }

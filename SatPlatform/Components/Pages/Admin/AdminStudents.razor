@@ -3,6 +3,7 @@
 @inherits AppPage
 @inject AcademyService Academy
 @inject AnalyticsService Analytics
+@inject CrmService Crm
 
 <PageTitle>O'quvchilar</PageTitle>
 
@@ -16,13 +17,29 @@ else
             <select class="input sm" @bind="groupId"><option value="0">Barcha guruhlar</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select>
             <select class="input sm" @bind="scoreBand"><option value="">Ball</option><option value="none">Ballsiz</option><option value="lt1000">&lt; 1000</option><option value="1000-1200">1000–1200</option><option value="1200-1400">1200–1400</option><option value="gt1400">&gt; 1400</option></select>
     </div>
+    <div class="row between mb">
+        <div class="chips">@foreach (var (k, label) in Tabs) { <button class="chip @(tab == k ? "active" : "")" @onclick="() => tab = k">@label</button> }</div>
+        <div class="col-menu">
+            <button class="btn sm" @onclick="() => colsOpen = !colsOpen" title="Ustunlarni sozlash"><Icon Name="settings" Size="16" /> Ustunlar</button>
+            @if (colsOpen)
+            {
+                <div class="att-backdrop" @onclick="() => colsOpen = false"></div>
+                <div class="col-pop">@foreach (var (k, label) in Cols) { <label class="check"><input type="checkbox" checked="@Show(k)" @onchange="e => ToggleCol(k, (bool)e.Value!)" /> @label</label> }</div>
+            }
+        </div>
+    </div>
     <div class="card pad-0"><div class="list-head"><span class="count-pill">Umumiy soni: <b>@Filtered.Count()</b></span></div><div class="table-wrap"><table class="table">
-        <thead><tr><th class="no">№</th><th>Ism</th><th>Telefon</th><th>Guruh</th><th>Holat</th><th class="num">Ball</th><th class="num">Maqsad</th><th class="num">Aniqlik</th><th class="num">Davomat</th><th>Oxirgi faollik</th><th></th></tr></thead>
+        <thead><tr><th class="no">№</th><th>Ism</th>
+            @if (Show("phone")) { <th>Telefon</th> }@if (Show("groups")) { <th>Guruh</th> }@if (Show("status")) { <th>Holat</th> }@if (Show("balance")) { <th class="num">Balans</th> }@if (Show("pay")) { <th>To'lov sanasi</th> }
+            @if (Show("score")) { <th class="num">Ball</th> }@if (Show("target")) { <th class="num">Maqsad</th> }@if (Show("acc")) { <th class="num">Aniqlik</th> }@if (Show("att")) { <th class="num">Davomat</th> }@if (Show("active")) { <th>Oxirgi faollik</th> }<th></th></tr></thead>
         <tbody>@foreach (var (s, n) in Filtered.Select((s, i) => (s, i + 1)))
         {
+            var bal = balances.GetValueOrDefault(s.StudentId);
             <tr class="click" @onclick="@(() => Nav.NavigateTo($"/admin/students/{s.StudentId}"))">
-                <td class="no">@n</td><td class="bold">@s.Name</td><td><PhoneLink Value="@s.Phone" /></td><td>@s.Groups</td><td><span class="badge @(s.Status == StudentStatus.Active ? "ok" : "")">@Labels.StudentStatus(s.Status)</span></td>
-                <td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Target?.ToString() ?? "—")</td><td class="num">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num">@(s.Attendance?.ToString() ?? "—")%</td><td>@Tz.Fmt(s.LastActive)</td>
+                <td class="no">@n</td><td class="bold">@s.Name</td>
+                @if (Show("phone")) { <td><PhoneLink Value="@s.Phone" /></td> }@if (Show("groups")) { <td>@s.Groups</td> }@if (Show("status")) { <td><span class="badge @(s.Status == StudentStatus.Active ? "ok" : "")">@Labels.StudentStatus(s.Status)</span></td> }
+                @if (Show("balance")) { <td class="num @((bal?.Balance ?? 0) < 0 ? "level-weak" : "")">@Labels.Money(bal?.Balance ?? 0)</td> }@if (Show("pay")) { <td>@(bal?.NextPaymentDate?.ToString("dd.MM.yyyy") ?? "—")</td> }
+                @if (Show("score")) { <td class="num bold">@(s.Score?.ToString() ?? "—")</td> }@if (Show("target")) { <td class="num">@(s.Target?.ToString() ?? "—")</td> }@if (Show("acc")) { <td class="num">@(s.Accuracy?.ToString() ?? "—")%</td> }@if (Show("att")) { <td class="num">@(s.Attendance?.ToString() ?? "—")%</td> }@if (Show("active")) { <td>@Tz.Fmt(s.LastActive)</td> }
                 <td><a class="btn sm" href="/admin/students/@s.StudentId">Ochish</a></td>
             </tr>
         }</tbody></table></div>@if (!Filtered.Any()) { <div class="empty"><h3>O'quvchilar topilmadi</h3></div> }</div>
@@ -49,11 +66,38 @@ else
 
     private IEnumerable<AnalyticsService.StudentSummary> Filtered => students.Where(s =>
         (string.IsNullOrWhiteSpace(search) || s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || PhoneFormat.Matches(s.Phone, search)) &&
-        (status == "" || s.Status.ToString() == status) &&
+        InTab(s) && (status == "" || s.Status.ToString() == status) &&
         (groupId == 0 || s.Groups.Split(", ").Contains(groups.FirstOrDefault(g => g.Id == groupId)?.Name)) &&
         (scoreBand switch { "none" => s.Score is null, "lt1000" => s.Score < 1000, "1000-1200" => s.Score is >= 1000 and < 1200, "1200-1400" => s.Score is >= 1200 and < 1400, "gt1400" => s.Score >= 1400, _ => true }));
 
-    protected override async Task OnInitializedAsync() { SetTitle("O'quvchilar"); groups = await Academy.GroupsAsync(); students = await Analytics.StudentSummariesAsync(); Loading = false; }
+    [SupplyParameterFromQuery(Name = "tab")] public string? QTab { get; set; }
+    private string tab = "";
+    private bool colsOpen;
+    private Dictionary<int, BalanceRow> balances = [];
+    private readonly HashSet<string> hidden = ["target", "acc", "att", "active"];
+    private static readonly (string, string)[] Tabs = [("", "Hammasi"), ("new", "Yangi"), ("active", "Aktiv"), ("archive", "Arxiv"), ("expiring", "Joriy oyda obunasi tugaydiganlar")];
+    private static readonly (string, string)[] Cols = [("phone", "Telefon"), ("groups", "Guruh"), ("status", "Holat"), ("balance", "Balans"), ("pay", "To'lov sanasi"), ("score", "Ball"), ("target", "Maqsad"), ("acc", "Aniqlik"), ("att", "Davomat"), ("active", "Oxirgi faollik")];
+    private bool Show(string k) => !hidden.Contains(k);
+    private void ToggleCol(string k, bool on) { if (on) hidden.Remove(k); else hidden.Add(k); }
+
+    private bool InTab(AnalyticsService.StudentSummary s) => tab switch
+    {
+        "new" => s.Status == StudentStatus.Applicant,
+        "active" => s.Status == StudentStatus.Active,
+        "archive" => s.Status is StudentStatus.Dropped or StudentStatus.Graduated,
+        "expiring" => balances.GetValueOrDefault(s.StudentId)?.NextPaymentDate is { } d && d.Year == Tz.Today.Year && d.Month == Tz.Today.Month,
+        _ => true
+    };
+
+    protected override void OnParametersSet() { if (QTab is not null && Tabs.Any(t => t.Item1 == QTab)) tab = QTab; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("O'quvchilar");
+        groups = await Academy.GroupsAsync(); students = await Analytics.StudentSummariesAsync();
+        balances = (await Crm.BalancesAsync()).ToDictionary(b => b.StudentId);
+        Loading = false;
+    }
 
     private async Task ExportAsync() => await JS.InvokeVoidAsync("sat.download", "oquvchilar.csv", CsvExport.Build(["№", "Ism", "Telefon", "Guruh", "Holat", "Ball", "Maqsad", "Aniqlik %", "Davomat %"], Filtered.Select((s, i) => new object?[] { i + 1, s.Name, s.Phone, s.Groups, Labels.StudentStatus(s.Status), s.Score, s.Target, s.Accuracy, s.Attendance })), "text/csv");
 

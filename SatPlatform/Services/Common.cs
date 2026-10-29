@@ -135,6 +135,9 @@ public static class Tz
 
 public static class Labels
 {
+    public static string LeadStatus(LeadStatus s) => s switch { Data.LeadStatus.New => "Yangi", Data.LeadStatus.Contacted => "Bog'lanildi", Data.LeadStatus.Trial => "Sinov darsi", Data.LeadStatus.Won => "O'quvchi bo'ldi", _ => "Yo'qotildi" };
+    public static string PaymentMethod(PaymentMethod m) => m switch { Data.PaymentMethod.Cash => "Naqd", Data.PaymentMethod.Card => "Karta", Data.PaymentMethod.Transfer => "O'tkazma", _ => "Hisoblash (qarz)" };
+    public static string Money(decimal v) => v.ToString("#,0.##", System.Globalization.CultureInfo.InvariantCulture).Replace(",", " ");
     public static string Section(Section s) => s == Data.Section.RW ? "Reading & Writing" : "Math";
     public static string SectionShort(Section s) => s == Data.Section.RW ? "R&W" : "Math";
     public static string Difficulty(Difficulty d) => d switch { Data.Difficulty.Easy => "Oson", Data.Difficulty.Medium => "O'rta", _ => "Qiyin" };

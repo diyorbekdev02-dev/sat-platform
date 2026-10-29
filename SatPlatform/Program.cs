@@ -54,6 +54,8 @@ builder.Services.AddSingleton<TestEngineService>();
 builder.Services.AddSingleton<PracticeService>();
 builder.Services.AddSingleton<AnalyticsService>();
 builder.Services.AddSingleton<AcademyService>();
+builder.Services.AddSingleton<CrmService>();
+builder.Services.AddSingleton<CrmService>();
 builder.Services.AddSingleton<HomeworkService>();
 builder.Services.AddSingleton<MaterialService>();
 builder.Services.AddSingleton<NotificationService>();

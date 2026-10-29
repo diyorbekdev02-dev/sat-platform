@@ -22,6 +22,16 @@
             @foreach (var item in Items)
             {
                 if (item.Section is not null) { <div class="nav-section">@item.Section</div> continue; }
+                if (item.Kids is not null)
+                {
+                    var isOpen = openGroups.Contains(item.Text) || item.Kids.Any(k => IsActive(k.Href));
+                    <button class="nav-group @(item.Kids.Any(k => IsActive(k.Href)) ? "active" : "")" @onclick="() => ToggleGroup(item.Text)"><Icon Name="@item.Icon" /> <span>@item.Text</span><span class="chev @(isOpen ? "open" : "")"><Icon Name="chevron-down" Size="14" /></span></button>
+                    if (isOpen)
+                    {
+                        <div class="nav-kids">@foreach (var k in item.Kids) { <a href="@k.Href" class="@(IsActive(k.Href) ? "active" : "")" @onclick="() => menuOpen = false"><span>@k.Text</span></a> }</div>
+                    }
+                    continue;
+                }
                 <NavLink href="@item.Href" Match="@(item.Href is "/dashboard" or "/teacher" or "/admin" or "/parent" ? NavLinkMatch.All : NavLinkMatch.Prefix)" @onclick="() => menuOpen = false">
                     <Icon Name="@item.Icon" /> <span>@item.Text</span>
                     @if (item.Href == "/mistakes" && mistakes > 0) { <span class="badge danger">@mistakes</span> }
@@ -82,7 +92,17 @@
     private string Title => PageTitleState.Current;
     private string ContentClass => PageTitleState.Narrow ? "narrow" : "";
 
-    private record NavItem(string Href, string Text, string Icon, string? Section = null);
+    private record NavItem(string Href, string Text, string Icon, string? Section = null, NavItem[]? Kids = null);
+    private readonly HashSet<string> openGroups = [];
+    private void ToggleGroup(string g) { if (!openGroups.Remove(g)) openGroups.Add(g); }
+    private bool IsActive(string href)
+    {
+        var cur = "/" + Nav.ToBaseRelativePath(Nav.Uri);
+        if (href.Contains('?')) return cur.Equals(href, StringComparison.OrdinalIgnoreCase);
+        var path = cur.Split('?')[0];
+        var hasOtherQueryLink = Items.SelectMany(i => i.Kids ?? []).Any(k => k.Href.StartsWith(href + "?"));
+        return hasOtherQueryLink ? path.Equals(href, StringComparison.OrdinalIgnoreCase) && !cur.Contains('?') : path.Equals(href, StringComparison.OrdinalIgnoreCase) || path.StartsWith(href + "/", StringComparison.OrdinalIgnoreCase);
+    }
     private List<NavItem> Items = [];
 
     protected override async Task OnInitializedAsync()
@@ -106,17 +126,19 @@
             ],
             UserRole.Teacher or UserRole.Assistant =>
             [
-                new("/teacher", "Bosh sahifa", "home"), new("/teacher/groups", "Guruhlar", "users"), new("/teacher/students", "O'quvchilar", "user"), new("/teacher/attendance", "Davomat", "calendar"), new("/teacher/schedule", "Dars jadvali", "clock"),
+                new("/teacher", "Bosh sahifa", "home"), new("/tasks", "Topshiriqlar", "clipboard"), new("/teacher/groups", "Guruhlar", "users"), new("/teacher/students", "O'quvchilar", "user"), new("/teacher/attendance", "Davomat", "calendar"), new("/teacher/schedule", "Dars jadvali", "clock"),
                 new("/teacher/assign", "Test tayinlash", "tests"), new("/teacher/homework", "Uy vazifalari", "clipboard"), new("/teacher/analytics", "Tahlil", "chart"), new("/materials", "Materiallar", "book"),
                 new("", "", "", "Kontent"), new("/admin/questions", "Savollar banki", "database"), new("/help", "Qo'llanma", "book"), new("/profile", "Profil", "user")
             ],
             UserRole.Parent => [new("/parent", "Farzandim", "home"), new("/parent/tests", "Testlar", "tests"), new("/parent/attendance", "Davomat", "calendar"), new("/help", "Qo'llanma", "book"), new("/profile", "Profil", "user")],
             _ =>
             [
-                new("/admin", "Bosh sahifa", "home"),
+                new("/admin", "Bosh sahifa", "home"), new("/tasks", "Topshiriqlar", "clipboard"), new("/admin/leads", "Lidlar", "target"),
+                new("", "", "", "O'quv markaz"),
+                new("", "Guruh", "layers", null, [new("/admin/groups", "Guruhlar", ""), new("/teacher/schedule", "Dars jadvali", ""), new("/teacher/attendance", "Davomat", ""), new("/teacher/homework", "Uy vazifalari", ""), new("/teacher/assign", "Test tayinlash", "")]),
+                new("", "O'quvchilar", "user", null, [new("/admin/students", "Hammasi", ""), new("/admin/students?tab=new", "Yangi o'quvchilar", ""), new("/admin/students?tab=active", "Aktiv o'quvchilar", ""), new("/admin/students?tab=archive", "Arxiv o'quvchilar", ""), new("/admin/students?tab=expiring", "Joriy oyda obunasi tugaydiganlar", ""), new("/admin/users?role=Parent", "Ota-ona", "")]),
+                new("/admin/payments", "To'lovlar", "check"), new("/admin/users", "Xodimlar", "users"),
                 new("", "", "", "Kontent"), new("/admin/questions", "Savollar banki", "database"), new("/admin/tests", "Testlar", "tests"), new("/admin/materials", "Materiallar", "book"),
-                new("", "", "", "O'quv markaz"), new("/admin/students", "O'quvchilar", "user"), new("/admin/users", "Xodimlar va ota-onalar", "users"), new("/admin/groups", "Guruhlar", "layers"),
-                new("/teacher/attendance", "Davomat", "calendar"), new("/teacher/schedule", "Dars jadvali", "clock"), new("/teacher/homework", "Uy vazifalari", "clipboard"), new("/teacher/assign", "Test tayinlash", "send"),
                 new("", "", "", "Tahlil va sozlamalar"), new("/admin/analytics", "Tahlil", "chart"), new("/admin/settings", "Sozlamalar", "settings"), new("/admin/audit", "Audit jurnali", "shield"), new("/help", "Qo'llanma", "book"), new("/profile", "Profil", "user")
             ]
         };

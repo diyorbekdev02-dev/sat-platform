@@ -43,7 +43,7 @@ else
                                 var r = rows[n];
                                 <tr>
                                     <td class="nm"><b>@r.Name</b></td>
-                                    @foreach (var d in days)
+                                    @foreach (var (d, di) in days.Select((d, i) => (d, i)))
                                     {
                                         AttendanceStatus? s = r.Cells.TryGetValue(d, out var v) ? v : null;
                                         <td class="att-td">
@@ -51,7 +51,7 @@ else
                                             @if (open == (r.StudentId, d))
                                             {
                                                 <div class="att-backdrop" @onclick="() => open = null"></div>
-                                                <div class="att-menu @(n >= rows.Count - 2 && rows.Count > 3 ? "up" : "")">
+                                                <div class="att-menu @(n >= rows.Count - 2 && rows.Count > 3 ? "up" : "") @(di >= days.Count - 3 ? "end" : "")">
                                                     @foreach (var o in Order)
                                                     {
                                                         <button class="@(s == o ? "sel" : "")" @onclick="() => Pick(r, d, o)"><i class="att-dot @Css(o)"></i>@Label(o)</button>

@@ -455,3 +455,18 @@ select.input { appearance: auto; }
 .sched td.time, .sched th.time { border-left: 0; text-align: left; }
 .sched td.busy { background: var(--accent-soft); }
 .sched td.busy a { color: var(--accent); text-decoration: none; }
+.kanban { display: grid; grid-template-columns: repeat(5, minmax(210px, 1fr)); gap: 12px; overflow-x: auto; align-items: start; }
+.kcol { background: var(--bg-3); border-radius: var(--radius); padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+.khead { display: flex; justify-content: space-between; align-items: center; font-weight: 700; font-size: 13px; }
+.kcard { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+.kcard:hover { border-color: var(--accent); }
+.col-menu { position: relative; }
+.col-pop { position: absolute; z-index: 31; right: 0; top: 100%; margin-top: 4px; min-width: 190px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.18); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.nav-group { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border: 0; background: none; border-radius: 10px; color: var(--text); font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; text-align: left; }
+.nav-group:hover { background: var(--hover); }
+.nav-group.active { color: var(--accent); }
+.nav-group .chev { margin-left: auto; display: inline-flex; transition: transform var(--t-fast); }
+.nav-group .chev.open { transform: rotate(180deg); }
+.nav-kids { display: flex; flex-direction: column; gap: 1px; margin: 0 0 4px 22px; padding-left: 12px; border-left: 2px solid var(--border); }
+.nav-kids a { padding: 7px 10px; font-size: 13.5px; font-weight: 500; }
+.att-menu.end { left: auto; right: 0; transform: none; }

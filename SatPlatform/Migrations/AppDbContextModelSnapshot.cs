@@ -568,6 +568,52 @@ namespace SatPlatform.Migrations
                     b.ToTable("HomeworkSubmissions");
                 });
 
+            modelBuilder.Entity("SatPlatform.Data.Lead", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Course")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("FullName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
+                    b.Property<int?>("ModeratorUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("Source")
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ModeratorUserId");
+
+                    b.ToTable("Leads");
+                });
+
             modelBuilder.Entity("SatPlatform.Data.LoginToken", b =>
                 {
                     b.Property<string>("Token")
@@ -739,6 +785,44 @@ namespace SatPlatform.Migrations
                     b.HasIndex("StudentId");
 
                     b.ToTable("ParentStudents");
+                });
+
+            modelBuilder.Entity("SatPlatform.Data.Payment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(14, 2)
+                        .HasColumnType("numeric(14,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("date");
+
+                    b.Property<int>("Method")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StudentId", "Date");
+
+                    b.ToTable("Payments");
                 });
 
             modelBuilder.Entity("SatPlatform.Data.PhoneVerification", b =>
@@ -1178,6 +1262,45 @@ namespace SatPlatform.Migrations
                     b.ToTable("Skills");
                 });
 
+            modelBuilder.Entity("SatPlatform.Data.StaffTask", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AssigneeUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<DateOnly?>("DueDate")
+                        .HasColumnType("date");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssigneeUserId");
+
+                    b.ToTable("StaffTasks");
+                });
+
             modelBuilder.Entity("SatPlatform.Data.Student", b =>
                 {
                     b.Property<int>("Id")
@@ -1188,6 +1311,9 @@ namespace SatPlatform.Migrations
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateOnly?>("NextPaymentDate")
+                        .HasColumnType("date");
 
                     b.Property<string>("Notes")
                         .HasMaxLength(500)
@@ -1796,6 +1922,16 @@ namespace SatPlatform.Migrations
                     b.Navigation("Student");
                 });
 
+            modelBuilder.Entity("SatPlatform.Data.Lead", b =>
+                {
+                    b.HasOne("SatPlatform.Data.User", "ModeratorUser")
+                        .WithMany()
+                        .HasForeignKey("ModeratorUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ModeratorUser");
+                });
+
             modelBuilder.Entity("SatPlatform.Data.Material", b =>
                 {
                     b.HasOne("SatPlatform.Data.MediaFile", "File")
@@ -1832,6 +1968,17 @@ namespace SatPlatform.Migrations
                         .IsRequired();
 
                     b.Navigation("ParentUser");
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("SatPlatform.Data.Payment", b =>
+                {
+                    b.HasOne("SatPlatform.Data.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("Student");
                 });
@@ -1935,6 +2082,16 @@ namespace SatPlatform.Migrations
                         .IsRequired();
 
                     b.Navigation("Domain");
+                });
+
+            modelBuilder.Entity("SatPlatform.Data.StaffTask", b =>
+                {
+                    b.HasOne("SatPlatform.Data.User", "AssigneeUser")
+                        .WithMany()
+                        .HasForeignKey("AssigneeUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("AssigneeUser");
                 });
 
             modelBuilder.Entity("SatPlatform.Data.Student", b =>

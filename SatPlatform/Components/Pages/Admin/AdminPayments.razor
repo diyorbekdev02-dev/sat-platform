@@ -1,0 +1,100 @@
+@page "/admin/payments"
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inherits AppPage
+@inject CrmService Crm
+
+<PageTitle>To'lovlar</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="row between mb"><h2 class="grow">To'lovlar va balans</h2><button class="btn" @onclick="ExportAsync"><Icon Name="download" /> Export</button></div>
+    <div class="filters">
+        <input class="input sm" placeholder="Qidiruv (ism yoki telefon)" @bind="search" @bind:event="oninput" />
+        <select class="input sm" @bind="filter">
+            <option value="">Hammasi</option><option value="debt">Qarzdorlar (balans &lt; 0)</option><option value="due">Joriy oyda to'lov muddati</option><option value="overdue">Muddati o'tgan</option>
+        </select>
+        <select class="input sm" @bind="group"><option value="">Barcha guruhlar</option>@foreach (var g in GroupNames) { <option value="@g">@g</option> }</select>
+    </div>
+    <div class="card pad-0">
+        <div class="list-head"><span class="count-pill">Umumiy soni: <b>@Filtered.Count()</b></span></div>
+        <div class="table-wrap"><table class="table">
+            <thead><tr><th class="no">№</th><th>O'quvchi</th><th>Telefon</th><th>Guruh</th><th class="num">Balans</th><th>To'lov sanasi</th><th></th></tr></thead>
+            <tbody>@foreach (var (r, n) in Filtered.Select((r, i) => (r, i + 1)))
+            {
+                <tr><td class="no">@n</td><td class="bold">@r.Name</td><td><PhoneLink Value="@r.Phone" /></td><td>@r.Groups</td>
+                    <td class="num bold @(r.Balance < 0 ? "level-weak" : "")">@Labels.Money(r.Balance)</td><td>@(r.NextPaymentDate?.ToString("dd.MM.yyyy") ?? "—")</td>
+                    <td><button class="btn sm" @onclick="() => Open(r)"><Icon Name="plus" Size="14" /> To'lov</button></td></tr>
+            }</tbody></table></div>
+        @if (!Filtered.Any()) { <div class="empty"><h3>O'quvchilar topilmadi</h3></div> }
+    </div>
+
+    <Modal Open="current is not null" OpenChanged="v => { if (!v) current = null; }" Title="@(current?.Name + " — to'lov")" Wide="true">
+        @if (current is not null)
+        {
+            <div class="small muted mb-s">Joriy balans: <b class="@(current.Balance < 0 ? "level-weak" : "")">@Labels.Money(current.Balance)</b></div>
+            <div class="form-row">
+                <div><label class="lbl">Turi</label><select class="input" @bind="method">@foreach (var m in Enum.GetValues<PaymentMethod>()) { <option value="@m">@Labels.PaymentMethod(m)</option> }</select></div>
+                <div><label class="lbl">Summa</label><input class="input" type="number" min="0" step="1000" @bind="amount" /></div>
+                <div><label class="lbl">Sana</label><input class="input" type="date" @bind="date" /></div>
+                <div><label class="lbl">Keyingi to'lov sanasi</label><input class="input" type="date" @bind="next" /></div>
+            </div>
+            <label class="lbl">Izoh</label><input class="input" @bind="note" />
+            @if (Error is not null) { <div class="error">@Error</div> }
+            <div class="modal-actions"><button class="btn" @onclick="() => current = null">Yopish</button><button class="btn primary" @onclick="SaveAsync" disabled="@busy">Saqlash</button></div>
+            <h3 class="mt">Tarix</h3>
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th>Sana</th><th>Turi</th><th class="num">Summa</th><th>Izoh</th></tr></thead>
+                <tbody>@foreach (var p in history) { <tr><td>@p.Date.ToString("dd.MM.yyyy")</td><td>@Labels.PaymentMethod(p.Method)</td><td class="num @(p.Amount < 0 ? "level-weak" : "")">@Labels.Money(p.Amount)</td><td>@p.Note</td></tr> }</tbody></table></div>
+            @if (history.Count == 0) { <div class="small muted">Hali to'lovlar yo'q.</div> }
+        }
+    </Modal>
+}
+
+@code {
+    private List<BalanceRow> rows = [];
+    private List<Payment> history = [];
+    private BalanceRow? current;
+    private string search = "", filter = "", group = "";
+    private PaymentMethod method = PaymentMethod.Cash;
+    private decimal amount;
+    private DateOnly date = Tz.Today;
+    private DateOnly? next;
+    private string? note;
+    private bool busy;
+
+    private IEnumerable<string> GroupNames => rows.SelectMany(r => r.Groups.Split(", ", StringSplitOptions.RemoveEmptyEntries)).Distinct().Order();
+    private IEnumerable<BalanceRow> Filtered => rows.Where(r =>
+        (string.IsNullOrWhiteSpace(search) || r.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || PhoneFormat.Matches(r.Phone, search)) &&
+        (group == "" || r.Groups.Split(", ").Contains(group)) &&
+        (filter switch
+        {
+            "debt" => r.Balance < 0,
+            "due" => r.NextPaymentDate is { } d && d.Year == Tz.Today.Year && d.Month == Tz.Today.Month,
+            "overdue" => r.NextPaymentDate is { } d2 && d2 < Tz.Today,
+            _ => true
+        })).OrderBy(r => r.Balance);
+
+    protected override async Task OnInitializedAsync() { SetTitle("To'lovlar"); rows = await Crm.BalancesAsync(); Loading = false; }
+
+    private async Task Open(BalanceRow r)
+    {
+        current = r; Error = null; amount = 0; note = null; method = PaymentMethod.Cash; date = Tz.Today; next = r.NextPaymentDate;
+        history = await Crm.PaymentsAsync(r.StudentId);
+    }
+
+    private async Task SaveAsync()
+    {
+        busy = true;
+        Error = await Crm.AddPaymentAsync(current!.StudentId, amount, method, date, note, next, await Me.IdAsync());
+        busy = false;
+        if (Error is not null) return;
+        Toasts.Ok("Saqlandi");
+        rows = await Crm.BalancesAsync();
+        current = rows.First(x => x.StudentId == current.StudentId);
+        history = await Crm.PaymentsAsync(current.StudentId);
+        amount = 0; note = null;
+    }
+
+    private async Task ExportAsync() => await JS.InvokeVoidAsync("sat.download", "tolovlar.csv", CsvExport.Build(["№", "O'quvchi", "Telefon", "Guruh", "Balans", "To'lov sanasi"], Filtered.Select((r, i) => new object?[] { i + 1, r.Name, r.Phone, r.Groups, r.Balance, r.NextPaymentDate?.ToString("dd.MM.yyyy") })), "text/csv");
+}

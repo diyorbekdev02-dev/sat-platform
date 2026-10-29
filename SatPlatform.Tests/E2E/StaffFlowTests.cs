@@ -18,27 +18,30 @@ public class StaffFlowTests(BrowserFixture f)
         await page.LoginAsync("+998901111111", Password, "/teacher");
         await page.WaitForSelectorAsync("text=Mening guruhlarim");
         await page.GoAsync("/teacher/groups");
-        await page.ClickAsync(".card:has-text('SAT Intensive A')");
+        await page.ClickAsync("tr:has-text('SAT Intensive A')");
         await page.WaitForSelectorAsync("h1:has-text('SAT Intensive A')");
         Assert.True(await page.Locator("table tbody tr").CountAsync() >= 5);
         // teacher must not see the other teacher's group
         await page.GoAsync("/teacher/groups");
-        Assert.Equal(0, await page.Locator(".card:has-text('SAT Foundation B')").CountAsync());
+        Assert.Equal(0, await page.Locator("tr:has-text('SAT Foundation B')").CountAsync());
 
         await page.GoAsync("/teacher/attendance");
         await page.WaitForSelectorAsync(".att-grid tbody tr");
         var rows = page.Locator(".att-grid tbody tr");
         // click a cell, pick a status from the popup
+        // pick a status different from the current one (the DB persists between runs)
         var first = rows.Nth(0).Locator("button.att-cell").Last;
-        await first.ClickAsync(); await page.ClickAsync(".att-menu button:has-text('Sababsiz')");
+        var firstPick = (await first.GetAttributeAsync("class"))!.Contains("absent") ? ("Kechikdi", "late") : ("Sababsiz", "absent");
+        await first.ClickAsync(); await page.ClickAsync($".att-menu button:has-text('{firstPick.Item1}')");
         var second = rows.Nth(1).Locator("button.att-cell").Last;
-        await second.ClickAsync(); await page.ClickAsync(".att-menu button:has-text('Kechikdi')");
-        await page.ClickAsync("button:has-text('Saqlash')");
+        var secondPick = (await second.GetAttributeAsync("class"))!.Contains("late") ? ("Sababli", "excused") : ("Kechikdi", "late");
+        await second.ClickAsync(); await page.ClickAsync($".att-menu button:has-text('{secondPick.Item1}')");
+        await page.ClickAsync("button.btn.primary:has-text('Saqlash')");
         await page.WaitForSelectorAsync(".toast:has-text('Davomat saqlandi')");
         await page.ReloadAsync();
         await page.WaitForSelectorAsync(".att-grid tbody tr");
-        Assert.Contains("absent", await page.Locator(".att-grid tbody tr").Nth(0).Locator("button.att-cell").Last.GetAttributeAsync("class"));
-        Assert.Contains("late", await page.Locator(".att-grid tbody tr").Nth(1).Locator("button.att-cell").Last.GetAttributeAsync("class"));
+        Assert.Contains(firstPick.Item2, await page.Locator(".att-grid tbody tr").Nth(0).Locator("button.att-cell").Last.GetAttributeAsync("class"));
+        Assert.Contains(secondPick.Item2, await page.Locator(".att-grid tbody tr").Nth(1).Locator("button.att-cell").Last.GetAttributeAsync("class"));
     }
 
     [Fact]
@@ -169,3 +172,46 @@ public class StaffFlowTests(BrowserFixture f)
     }
 }
 
+
+[Collection("e2e")]
+public class CrmPagesTests(BrowserFixture f)
+{
+    [Fact]
+    public async Task Admin_crm_pages_load_and_lead_payment_task_can_be_created()
+    {
+        if (!f.Available) return;
+        var page = await f.NewPageAsync();
+        await page.LoginAsync("+998900000000", "Admin123!", "/admin");
+
+        await page.GoAsync("/admin/students?tab=active");
+        await page.WaitForSelectorAsync(".filters");
+        await page.GoAsync("/admin/users?role=Parent");
+        await page.WaitForSelectorAsync(".chip.active:has-text('Ota-ona')");
+        await page.GoAsync("/teacher/schedule");
+        await page.WaitForSelectorAsync("table");
+
+        // lead
+        await page.GoAsync("/admin/leads");
+        await page.ClickAsync("button:has-text('Lid qo')");
+        await page.FillAsync(".modal input.input >> nth=0", "Test Lid");
+        await page.FillAsync(".modal input[type=tel]", "+998 90 555 44 33");
+        await page.ClickAsync(".modal button.primary");
+        await page.WaitForSelectorAsync(".toast:has-text('Lid saqlandi')");
+        await page.WaitForSelectorAsync("tr:has-text('Test Lid')");
+
+        // payment
+        await page.GoAsync("/admin/payments");
+        await page.WaitForSelectorAsync("tbody tr");
+        await page.Locator("tbody tr button:has-text('To')").First.ClickAsync();
+        await page.FillAsync(".modal input[type=number]", "500000");
+        await page.ClickAsync(".modal button.primary");
+        await page.WaitForSelectorAsync(".toast:has-text('Saqlandi')");
+
+        // task
+        await page.GoAsync("/tasks");
+        await page.ClickAsync("button:has-text('Topshiriq qo')");
+        await page.FillAsync(".modal input.input >> nth=0", "Test topshiriq");
+        await page.ClickAsync(".modal button.primary");
+        await page.WaitForSelectorAsync("tr:has-text('Test topshiriq')");
+    }
+}

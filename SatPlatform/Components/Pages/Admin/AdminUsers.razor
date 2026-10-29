@@ -45,7 +45,14 @@ else
     private string eName = "", ePhone = "+998 ", eEmail = "", ePassword = "";
     private UserRole eRole = UserRole.Teacher;
 
-    protected override async Task OnInitializedAsync() { SetTitle("Xodimlar va ota-onalar"); await LoadAsync(); Loading = false; }
+    [SupplyParameterFromQuery(Name = "role")] public string? QRole { get; set; }
+    private string? lastRole;
+
+    protected override async Task OnInitializedAsync() { SetTitle("Xodimlar va ota-onalar"); ApplyRole(); await LoadAsync(); Loading = false; }
+
+    protected override async Task OnParametersSetAsync() { if (!Loading && QRole != lastRole) { ApplyRole(); await LoadAsync(); } }
+
+    private void ApplyRole() { lastRole = QRole; role = Enum.TryParse<UserRole>(QRole, true, out var r) ? r : null; }
     private async Task LoadAsync() { users = (await Academy.UsersAsync(role, search)).Where(u => u.Role != UserRole.Student).ToList(); }
 
     private void Open(UserRow? u)

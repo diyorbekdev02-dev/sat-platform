@@ -274,6 +274,20 @@ public static class PageHelp
             S("Progress", "Sahifa pastida o'quvchining to'liq tahlili: skilllar, testlar, xatolar, vaqt, davomat, uy vazifasi."),
             Phone),
 
+        ["/admin/leads"] = T("Lidlar", "Yangi o'quvchi bo'lishi mumkin bo'lgan murojaatlar (CRM).",
+            S("Ro'yxat va taxta", "<b>Ro'yxat</b> — jadval; <b>Taxta</b> — holatlar bo'yicha ustunlar (Yangi, Bog'lanildi, Sinov darsi, O'quvchi bo'ldi, Yo'qotildi). Lidni bossangiz tahrirlash oynasi ochiladi."),
+            S("Filtrlar", "Qidiruv (ism yoki telefon), holat, manba va moderator. <b>Export</b> — CSV fayl."),
+            S("Lid qo'shish", "<b>Ism</b>, <b>Telefon</b>, kurs, manba (Instagram, Telegram…), holat, moderator va izoh. Holatni lid bilan ishlash davomida o'zgartirib boring.")),
+
+        ["/admin/payments"] = T("To'lovlar va balans", "O'quvchilarning balansi va to'lov sanalari.",
+            S("Jadval", "Har o'quvchining <b>balansi</b> (to'lovlar yig'indisi minus hisoblangan qarz) va keyingi <b>to'lov sanasi</b>. Manfiy balans qizil bilan ko'rsatiladi."),
+            S("Filtrlar", "<b>Qarzdorlar</b>, <b>Joriy oyda to'lov muddati</b>, <b>Muddati o'tgan</b> va guruh bo'yicha."),
+            S("To'lov qo'shish", "<b>To'lov</b> tugmasi: turi (Naqd, Karta, O'tkazma yoki <b>Hisoblash</b> — oylik qarz yozish), summa, sana va keyingi to'lov sanasi. Pastda to'lovlar tarixi.")),
+
+        ["/tasks"] = T("Topshiriqlar", "Xodimlar uchun ichki vazifalar.",
+            S("Ishlash", "<b>Topshiriq qo'shish</b> — sarlavha, tavsif, mas'ul va muddat. Katakchani belgilab bajarilgan deb qo'ying. Muddati o'tgan bajarilmagan topshiriqning sanasi qizil."),
+            S("Ko'rinish", "O'qituvchi faqat o'zining topshiriqlarini ko'radi; administrator hammasini ko'radi va xodim bo'yicha filtrlay oladi.")),
+
         ["/admin/users"] = T("Xodimlar va ota-onalar", "O'qituvchi, assistent, admin va ota-ona hisoblari (o'quvchilar alohida bo'limda).",
             S("Ro'yxat", "Ism, telefon (bossangiz qo'ng'iroq), rol, guruhlar, Telegram bog'langanmi, holat va oxirgi kirish. Qidiruv ism yoki telefon bo'yicha."),
             S("Foydalanuvchi qo'shish / tahrirlash", "<b>Rol</b>: O'qituvchi, Assistent, Admin, Ota-ona.", "<b>Savollar bankiga ruxsat</b> — o'qituvchiga savol yaratish va tahrirlash huquqi.", "<b>Hisob faol</b> — o'chirib qo'ysangiz kirolmaydi. Parol bo'sh bo'lsa mavjud parol saqlanadi."),

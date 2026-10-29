@@ -43,6 +43,9 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
 
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
+    public DbSet<Lead> Leads => Set<Lead>();
+    public DbSet<Payment> Payments => Set<Payment>();
+    public DbSet<StaffTask> StaffTasks => Set<StaffTask>();
     public DbSet<PhoneVerification> PhoneVerifications => Set<PhoneVerification>();
     public DbSet<TelegramLink> TelegramLinks => Set<TelegramLink>();
     public DbSet<LoginToken> LoginTokens => Set<LoginToken>();
@@ -57,6 +60,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
         b.Entity<User>().HasOne(u => u.Student).WithOne(s => s.User).HasForeignKey<Student>(s => s.UserId);
 
         b.Entity<Student>().HasIndex(s => s.UserId).IsUnique();
+        b.Entity<Payment>().HasOne(p => p.Student).WithMany().HasForeignKey(p => p.StudentId).OnDelete(DeleteBehavior.Cascade);
+        b.Entity<Payment>().HasIndex(p => new { p.StudentId, p.Date });
+        b.Entity<Payment>().Property(p => p.Amount).HasPrecision(14, 2);
+        b.Entity<Lead>().HasOne(l => l.ModeratorUser).WithMany().HasForeignKey(l => l.ModeratorUserId).OnDelete(DeleteBehavior.SetNull);
+        b.Entity<StaffTask>().HasOne(t => t.AssigneeUser).WithMany().HasForeignKey(t => t.AssigneeUserId).OnDelete(DeleteBehavior.SetNull);
         b.Entity<Student>().HasIndex(s => s.ParentCode).IsUnique();
 
         b.Entity<ParentStudent>().HasKey(p => new { p.ParentUserId, p.StudentId });
