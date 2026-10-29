@@ -188,7 +188,7 @@ public class CrmPagesTests(BrowserFixture f)
         await page.GoAsync("/admin/users?role=Parent");
         await page.WaitForSelectorAsync(".chip.active:has-text('Ota-ona')");
         await page.GoAsync("/teacher/schedule");
-        await page.WaitForSelectorAsync("table");
+        await page.WaitForSelectorAsync(".tl-block");
 
         // lead
         await page.GoAsync("/admin/leads");

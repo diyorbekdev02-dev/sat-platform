@@ -182,8 +182,9 @@ public static class PageHelp
             S("Bildirishnoma", "Saqlagach kelmagan va kechikkan o'quvchining <b>ota-onasiga Telegram orqali xabar</b> ketadi.")),
 
         ["/teacher/schedule"] = T("Dars jadvali", "Guruhlarning kunlik dars jadvali, xonalar bo'yicha.",
-            S("Qanday ishlaydi", "Tepada kunni tanlang (Yak–Sha). Ustunlarda xonalar, qatorlarda 30 daqiqalik vaqtlar; dars bor joy rangli va guruh nomi yoziladi.", "Guruh nomini bossangiz guruh sahifasi ochiladi."),
-            S("Hafta", "<b>Hafta</b> — barcha guruhlar kunlari, vaqti, xonasi va o'qituvchisi bilan ro'yxat.")),
+            S("Qanday ishlaydi", "Tepada kunni tanlang (Yak–Sha). <b>Xonalar</b> / <b>O'qituvchilar</b> tugmasi ustunlarni almashtiradi; chapda soatlar. Har dars rangli blok: guruh, vaqt, o'qituvchi (yoki xona) va o'quvchilar soni. Blokni bossangiz guruh sahifasi ochiladi."),
+            S("Filtrlar va Export", "Guruh, o'qituvchi va xona bo'yicha saralash; <b>Export</b> — jadvalni CSV qilib yuklaydi."),
+            S("Hafta", "<b>Hafta</b> — ustunlarda Dushanba–Yakshanba, har kunning darslari soatiga qarab joylashadi.")),
 
         ["/teacher/assign"] = T("Test tayinlash", "Chop etilgan testni guruh yoki o'quvchiga berish.",
             S("Yangi tayinlov", "<b>Test</b> — faqat chop etilgan testlar chiqadi.", "<b>Kimga</b> — <b>Guruh</b> yoki <b>Alohida o'quvchi</b>.", "<b>Boshlanish</b> va <b>Muddat</b> (ixtiyoriy); <b>Urinishlar soni</b> — bo'sh qoldirsangiz cheksiz.", "<b>Tayinlash</b> — o'quvchilarga bildirishnoma ketadi."),

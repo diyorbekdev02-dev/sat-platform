@@ -9,50 +9,119 @@
 else
 {
     <div class="card mb">
-        <div class="chips">
-            @foreach (var (num, label) in Tabs) { <button class="chip @(day == num ? "active" : "")" @onclick="() => day = num">@label</button> }
-            <button class="chip @(day == 0 ? "active" : "")" @onclick="() => day = 0">Hafta</button>
+        <div class="row between wrap">
+            <div class="chips">
+                @foreach (var (num, label) in Tabs) { <button class="chip @(day == num ? "active" : "") @(num == Today ? "today" : "")" @onclick="() => day = num">@label</button> }
+                <button class="chip @(day == 0 ? "active" : "")" @onclick="() => day = 0">Hafta</button>
+            </div>
+            <div class="row">
+                @if (day != 0)
+                {
+                    <div class="seg"><button class="@(byTeacher ? "" : "on")" @onclick="() => byTeacher = false">Xonalar</button><button class="@(byTeacher ? "on" : "")" @onclick="() => byTeacher = true">O'qituvchilar</button></div>
+                }
+                <button class="btn sm" @onclick="ExportAsync"><Icon Name="download" Size="16" /> Export</button>
+            </div>
+        </div>
+        <div class="filters mt-s" style="margin-bottom:0">
+            <select class="input sm" @bind="groupFilter"><option value="">Barcha guruhlar</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select>
+            <select class="input sm" @bind="teacherFilter"><option value="">Barcha o'qituvchilar</option>@foreach (var t in groups.Where(g => g.TeacherUser is not null).Select(g => g.TeacherUser!).DistinctBy(u => u.Id)) { <option value="@t.Id">@t.FullName</option> }</select>
+            <select class="input sm" @bind="roomFilter"><option value="">Barcha xonalar</option>@foreach (var r in groups.Select(g => g.Room).Where(r => !string.IsNullOrWhiteSpace(r)).Distinct().Order()) { <option value="@r">@r</option> }</select>
         </div>
     </div>
-    @if (day == 0)
+
+    @if (!Visible.Any())
     {
-        <div class="card pad-0"><div class="table-wrap"><table class="table">
-            <thead><tr><th>Guruh</th><th>Kunlar</th><th>Vaqt</th><th>Xona</th><th>O'qituvchi</th></tr></thead>
-            <tbody>@foreach (var g in groups.Where(g => g.StartTime is not null).OrderBy(g => g.StartTime))
-            {
-                <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/groups/{g.Id}"))"><td class="bold">@g.Name</td><td>@Labels.Days(g.ScheduleDays)</td><td>@g.StartTime?.ToString("HH:mm")–@g.EndTime?.ToString("HH:mm")</td><td>@(g.Room ?? "—")</td><td>@(g.TeacherUser?.FullName ?? "—")</td></tr>
-            }</tbody></table></div></div>
+        <div class="card"><div class="empty"><h3>Jadvalda dars yo'q</h3><p class="small">Guruhlarga dars kunlari va vaqti kiritilmagan yoki filtrga mos guruh yo'q.</p></div></div>
     }
     else
     {
-        <div class="card pad-0"><div class="table-wrap"><table class="table sched">
-            <thead><tr><th class="time"></th>@foreach (var r in rooms) { <th>@r</th> }</tr></thead>
-            <tbody>
-                @foreach (var slot in Slots)
+        var cols = Cols;
+        var from = FromHour; var to = ToHour;
+        <div class="card pad-0 tl-wrap">
+            <div class="tl" style="--n:@cols.Count;--h:@Hour">
+                <div class="tl-corner"></div>
+                @foreach (var c in cols) { <div class="tl-head @(c.Today ? "today" : "")">@c.Title@if (c.Sub is not null) { <small>@c.Sub</small> }</div> }
+                <div class="tl-times" style="height:@((to - from) * Hour)px">@for (var h = from; h < to; h++) { <div style="height:@(Hour)px">@($"{h:00}:00")</div> }</div>
+                @foreach (var c in cols)
                 {
-                    <tr><td class="time">@slot.ToString("HH:mm") - @slot.AddMinutes(30).ToString("HH:mm")</td>
-                    @foreach (var r in rooms)
-                    {
-                        var g = At(r, slot);
-                        <td class="@(g is null ? "" : "busy")">@if (g is not null && g.StartTime == slot) { <a href="/teacher/groups/@g.Id"><b>@g.Name</b><div class="tiny">@(g.TeacherUser?.FullName)</div></a> } else if (g is null) { <span class="muted">—</span> }</td>
-                    }
-                    </tr>
+                    <div class="tl-col" style="height:@((to - from) * Hour)px">
+                        @foreach (var (g, lane, lanes) in Layout(c.Items))
+                        {
+                            var top = ((g.StartTime!.Value.ToTimeSpan().TotalMinutes) - from * 60) / 60.0 * Hour;
+                            var height = Math.Max(30, (g.EndTime!.Value.ToTimeSpan() - g.StartTime!.Value.ToTimeSpan()).TotalMinutes / 60.0 * Hour - 3);
+                            <a class="tl-block" href="/teacher/groups/@g.Id" style="top:@(top.ToString("0.#", Inv))px;height:@(height.ToString("0.#", Inv))px;left:@((100.0 * lane / lanes).ToString("0.#", Inv))%;width:@((100.0 / lanes).ToString("0.#", Inv))%;@Color(g)">
+                                <b>@g.Name</b>
+                                <span>@g.StartTime?.ToString("HH:mm")–@g.EndTime?.ToString("HH:mm")</span>
+                                @if (height > 60) { <span>@Detail(g)</span> }
+                                @if (height > 90) { <span>@g.Enrollments.Count o'quvchi</span> }
+                            </a>
+                        }
+                    </div>
                 }
-            </tbody></table></div>
-            @if (rooms.Count == 0) { <div class="empty"><h3>Bu kuni dars yo'q</h3></div> }
+            </div>
         </div>
     }
 }
 
 @code {
-    private static readonly (int, string)[] Tabs = [(7, "Yak"), (1, "Du"), (2, "Se"), (3, "Chor"), (4, "Pa"), (5, "Ju"), (6, "Sha")];
-    private List<Group> groups = [];
-    private int day = ((int)Tz.Today.DayOfWeek == 0 ? 7 : (int)Tz.Today.DayOfWeek);
+    private record Col(string Title, string? Sub, bool Today, List<Group> Items);
 
-    private IEnumerable<Group> Today => groups.Where(g => g.StartTime is not null && g.EndTime is not null && g.ScheduleDays.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains(day.ToString()));
-    private List<string> rooms => Today.Select(g => g.Room ?? "—").Distinct().Order().ToList();
-    private IEnumerable<TimeOnly> Slots { get { for (var t = new TimeOnly(8, 0); t < new TimeOnly(22, 0); t = t.AddMinutes(30)) yield return t; } }
-    private Group? At(string room, TimeOnly slot) => Today.FirstOrDefault(g => (g.Room ?? "—") == room && g.StartTime <= slot && slot < g.EndTime);
+    private static readonly System.Globalization.CultureInfo Inv = System.Globalization.CultureInfo.InvariantCulture;
+    private static readonly (int, string)[] Tabs = [(7, "Yak"), (1, "Du"), (2, "Se"), (3, "Chor"), (4, "Pa"), (5, "Ju"), (6, "Sha")];
+    private static readonly (int, string)[] WeekDays = [(1, "Dushanba"), (2, "Seshanba"), (3, "Chorshanba"), (4, "Payshanba"), (5, "Juma"), (6, "Shanba"), (7, "Yakshanba")];
+    private const int Hour = 64;
+    private List<Group> groups = [];
+    private static int Today => (int)Tz.Today.DayOfWeek == 0 ? 7 : (int)Tz.Today.DayOfWeek;
+    private int day = Today;
+    private bool byTeacher;
+    private string groupFilter = "", teacherFilter = "", roomFilter = "";
+
+    private IEnumerable<Group> Visible => groups.Where(g => g.StartTime is not null && g.EndTime is not null && g.EndTime > g.StartTime &&
+        (groupFilter == "" || g.Id.ToString() == groupFilter) && (teacherFilter == "" || g.TeacherUserId.ToString() == teacherFilter) && (roomFilter == "" || g.Room == roomFilter));
+    private static bool OnDay(Group g, int d) => g.ScheduleDays.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains(d.ToString());
+    private string Key(Group g) => byTeacher ? (g.TeacherUser?.FullName ?? "O'qituvchi yo'q") : (string.IsNullOrWhiteSpace(g.Room) ? "Xonasiz" : g.Room + "-xona");
+
+    /// <summary>Week: one column per weekday. Day: one column per room (or teacher), empty ones included so the whole centre is visible.</summary>
+    private List<Col> Cols
+    {
+        get
+        {
+            if (day == 0) return WeekDays.Select(d => new Col(d.Item2, null, d.Item1 == Today, Visible.Where(g => OnDay(g, d.Item1)).OrderBy(g => g.StartTime).ToList())).ToList();
+            var keys = Visible.Select(Key).Distinct().Order().ToList();
+            return keys.Select(k => new Col(k, null, false, Visible.Where(g => OnDay(g, day) && Key(g) == k).OrderBy(g => g.StartTime).ToList())).ToList();
+        }
+    }
+
+    private int FromHour => Math.Max(6, Visible.Min(g => g.StartTime!.Value.Hour) - 1);
+    private int ToHour => Math.Min(24, Math.Max(Visible.Max(g => g.EndTime!.Value.Hour + (g.EndTime!.Value.Minute > 0 ? 1 : 0)), FromHour + 5));
+
+    /// <summary>Side-by-side lanes for lessons that overlap in the same column.</summary>
+    private static List<(Group, int, int)> Layout(List<Group> items)
+    {
+        var res = new List<(Group, int, int)>();
+        var cluster = new List<(Group g, int lane)>();
+        TimeOnly clusterEnd = default;
+        void Flush() { var lanes = cluster.Count == 0 ? 1 : cluster.Max(c => c.lane) + 1; res.AddRange(cluster.Select(c => (c.g, c.lane, lanes))); cluster.Clear(); }
+        foreach (var g in items)
+        {
+            if (cluster.Count > 0 && g.StartTime >= clusterEnd) Flush();
+            var used = cluster.Where(c => c.g.EndTime > g.StartTime).Select(c => c.lane).ToHashSet();
+            var lane = 0; while (used.Contains(lane)) lane++;
+            cluster.Add((g, lane));
+            clusterEnd = cluster.Max(c => c.g.EndTime!.Value);
+        }
+        Flush();
+        return res;
+    }
+
+    private string Detail(Group g) => day == 0 ? (g.Room is null ? "" : g.Room + "-xona") : byTeacher ? (g.Room is null ? "" : g.Room + "-xona") : (g.TeacherUser?.FullName ?? "");
+    private static string Color(Group g) { var h = (g.Id * 47) % 360; return $"--sc:hsl({h} 65% 40%);--sbg:hsl({h} 85% 93%)"; }
+
+    private async Task ExportAsync()
+    {
+        var rows = Visible.OrderBy(g => g.StartTime).Select(g => new object?[] { g.Name, Labels.Days(g.ScheduleDays), $"{g.StartTime:HH:mm}-{g.EndTime:HH:mm}", g.Room, g.TeacherUser?.FullName, g.Enrollments.Count });
+        await JS.InvokeVoidAsync("sat.download", "dars-jadvali.csv", CsvExport.Build(["Guruh", "Kunlar", "Vaqt", "Xona", "O'qituvchi", "O'quvchilar"], rows), "text/csv");
+    }
 
     protected override async Task OnInitializedAsync()
     {
