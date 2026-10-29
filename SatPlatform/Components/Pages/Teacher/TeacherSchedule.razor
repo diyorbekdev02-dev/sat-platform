@@ -1,0 +1,64 @@
+@page "/teacher/schedule"
+@attribute [Authorize(Roles = "Teacher,Assistant,Admin,SuperAdmin")]
+@inherits AppPage
+@inject AcademyService Academy
+
+<PageTitle>Dars jadvali</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="card mb">
+        <div class="chips">
+            @foreach (var (num, label) in Tabs) { <button class="chip @(day == num ? "active" : "")" @onclick="() => day = num">@label</button> }
+            <button class="chip @(day == 0 ? "active" : "")" @onclick="() => day = 0">Hafta</button>
+        </div>
+    </div>
+    @if (day == 0)
+    {
+        <div class="card pad-0"><div class="table-wrap"><table class="table">
+            <thead><tr><th>Guruh</th><th>Kunlar</th><th>Vaqt</th><th>Xona</th><th>O'qituvchi</th></tr></thead>
+            <tbody>@foreach (var g in groups.Where(g => g.StartTime is not null).OrderBy(g => g.StartTime))
+            {
+                <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/groups/{g.Id}"))"><td class="bold">@g.Name</td><td>@Labels.Days(g.ScheduleDays)</td><td>@g.StartTime?.ToString("HH:mm")–@g.EndTime?.ToString("HH:mm")</td><td>@(g.Room ?? "—")</td><td>@(g.TeacherUser?.FullName ?? "—")</td></tr>
+            }</tbody></table></div></div>
+    }
+    else
+    {
+        <div class="card pad-0"><div class="table-wrap"><table class="table sched">
+            <thead><tr><th class="time"></th>@foreach (var r in rooms) { <th>@r</th> }</tr></thead>
+            <tbody>
+                @foreach (var slot in Slots)
+                {
+                    <tr><td class="time">@slot.ToString("HH:mm") - @slot.AddMinutes(30).ToString("HH:mm")</td>
+                    @foreach (var r in rooms)
+                    {
+                        var g = At(r, slot);
+                        <td class="@(g is null ? "" : "busy")">@if (g is not null && g.StartTime == slot) { <a href="/teacher/groups/@g.Id"><b>@g.Name</b><div class="tiny">@(g.TeacherUser?.FullName)</div></a> } else if (g is null) { <span class="muted">—</span> }</td>
+                    }
+                    </tr>
+                }
+            </tbody></table></div>
+            @if (rooms.Count == 0) { <div class="empty"><h3>Bu kuni dars yo'q</h3></div> }
+        </div>
+    }
+}
+
+@code {
+    private static readonly (int, string)[] Tabs = [(7, "Yak"), (1, "Du"), (2, "Se"), (3, "Chor"), (4, "Pa"), (5, "Ju"), (6, "Sha")];
+    private List<Group> groups = [];
+    private int day = ((int)Tz.Today.DayOfWeek == 0 ? 7 : (int)Tz.Today.DayOfWeek);
+
+    private IEnumerable<Group> Today => groups.Where(g => g.StartTime is not null && g.EndTime is not null && g.ScheduleDays.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains(day.ToString()));
+    private List<string> rooms => Today.Select(g => g.Room ?? "—").Distinct().Order().ToList();
+    private IEnumerable<TimeOnly> Slots { get { for (var t = new TimeOnly(8, 0); t < new TimeOnly(22, 0); t = t.AddMinutes(30)) yield return t; } }
+    private Group? At(string room, TimeOnly slot) => Today.FirstOrDefault(g => (g.Room ?? "—") == room && g.StartTime <= slot && slot < g.EndTime);
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Dars jadvali");
+        var uid = await Me.IdAsync(); var role = (await Me.RoleAsync())!.Value;
+        groups = await Academy.GroupsAsync(await Academy.GroupScopeAsync(uid, role));
+        Loading = false;
+    }
+}

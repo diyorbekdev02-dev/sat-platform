@@ -10,7 +10,7 @@
 @if (Loading) { <div class="loading"><span class="spinner"></span></div> }
 else
 {
-    <div class="row between mb"><h2 class="grow">Guruhlar</h2><button class="btn primary" @onclick="() => Open(null)"><Icon Name="plus" /> Guruh yaratish</button></div>
+    <div class="row between mb"><h2 class="grow">Guruhlar</h2><div class="row"><button class="btn" @onclick="ExportAsync"><Icon Name="download" /> Export</button><button class="btn primary" @onclick="() => Open(null)"><Icon Name="plus" /> Guruh yaratish</button></div></div>
     <div class="filters">
         <input class="input sm" placeholder="Qidiruv (guruh nomi)" @bind="search" @bind:event="oninput" />
         <select class="input sm" @bind="teacherFilter"><option value="">Barcha o'qituvchilar</option>@foreach (var t in teachers) { <option value="@t.Id">@t.FullName</option> }</select>
@@ -67,6 +67,8 @@ else
         (teacherFilter == "" || g.TeacherUserId.ToString() == teacherFilter) &&
         (dayFilter == "" || g.ScheduleDays.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains(dayFilter)));
     private int enrollStudent;
+
+    private async Task ExportAsync() => await JS.InvokeVoidAsync("sat.download", "guruhlar.csv", CsvExport.Build(["№", "Nomi", "Kurs", "O'qituvchi", "Kunlar", "Vaqt", "Xona", "O'quvchilar"], Filtered.Select((g, i) => new object?[] { i + 1, g.Name, g.CourseType, g.TeacherUser?.FullName, Labels.Days(g.ScheduleDays), $"{g.StartTime:HH:mm}-{g.EndTime:HH:mm}", g.Room, g.Enrollments.Count })), "text/csv");
 
     protected override async Task OnInitializedAsync()
     {

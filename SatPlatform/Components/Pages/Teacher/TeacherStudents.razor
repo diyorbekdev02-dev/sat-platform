@@ -12,6 +12,7 @@ else
     <div class="filters">
         <input class="input sm" placeholder="Qidiruv (ism yoki telefon)" @bind="search" @bind:event="oninput" />
         <select class="input sm" @bind="groupFilter"><option value="">Barcha guruhlar</option>@foreach (var g in GroupNames) { <option value="@g">@g</option> }</select>
+        <button class="btn sm" @onclick="ExportAsync"><Icon Name="download" Size="16" /> Export</button>
     </div>
     <div class="row between mb">
         <div class="chips"><button class="chip @(sort == "name" ? "active" : "")" @onclick="@(() => sort = "name")">Ism</button><button class="chip @(sort == "score" ? "active" : "")" @onclick="@(() => sort = "score")">Ball</button><button class="chip @(sort == "weak" ? "active" : "")" @onclick="@(() => sort = "weak")">Eng zaif</button><button class="chip @(sort == "active" ? "active" : "")" @onclick="@(() => sort = "active")">Faollik</button></div>
@@ -41,6 +42,8 @@ else
             return sort switch { "score" => q.OrderByDescending(s => s.Score ?? 0), "weak" => q.OrderBy(s => s.Accuracy ?? 101), "active" => q.OrderByDescending(s => s.LastActive), _ => q.OrderBy(s => s.Name) };
         }
     }
+    private async Task ExportAsync() => await JS.InvokeVoidAsync("sat.download", "oquvchilar.csv", CsvExport.Build(["№", "Ism", "Telefon", "Guruh", "Ball", "Aniqlik %", "Davomat %"], Sorted.Select((s, i) => new object?[] { i + 1, s.Name, s.Phone, s.Groups, s.Score, s.Accuracy, s.Attendance })), "text/csv");
+
     protected override async Task OnInitializedAsync()
     {
         SetTitle("O'quvchilar");

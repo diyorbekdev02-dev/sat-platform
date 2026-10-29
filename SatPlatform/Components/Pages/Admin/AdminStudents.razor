@@ -9,7 +9,7 @@
 @if (Loading) { <div class="loading"><span class="spinner"></span></div> }
 else
 {
-    <div class="row between mb"><h2 class="grow">O'quvchilar</h2><button class="btn primary" @onclick="() => createOpen = true"><Icon Name="plus" /> O'quvchi qo'shish</button></div>
+    <div class="row between mb"><h2 class="grow">O'quvchilar</h2><div class="row"><button class="btn" @onclick="ExportAsync"><Icon Name="download" /> Export</button><button class="btn primary" @onclick="() => createOpen = true"><Icon Name="plus" /> O'quvchi qo'shish</button></div></div>
     <div class="filters">
         <input class="input sm" placeholder="Qidiruv (ism yoki telefon)" @bind="search" @bind:event="oninput" />
             <select class="input sm" @bind="status"><option value="">Barcha holatlar</option>@foreach (var s in Enum.GetValues<StudentStatus>()) { <option value="@s">@Labels.StudentStatus(s)</option> }</select>
@@ -54,6 +54,8 @@ else
         (scoreBand switch { "none" => s.Score is null, "lt1000" => s.Score < 1000, "1000-1200" => s.Score is >= 1000 and < 1200, "1200-1400" => s.Score is >= 1200 and < 1400, "gt1400" => s.Score >= 1400, _ => true }));
 
     protected override async Task OnInitializedAsync() { SetTitle("O'quvchilar"); groups = await Academy.GroupsAsync(); students = await Analytics.StudentSummariesAsync(); Loading = false; }
+
+    private async Task ExportAsync() => await JS.InvokeVoidAsync("sat.download", "oquvchilar.csv", CsvExport.Build(["№", "Ism", "Telefon", "Guruh", "Holat", "Ball", "Maqsad", "Aniqlik %", "Davomat %"], Filtered.Select((s, i) => new object?[] { i + 1, s.Name, s.Phone, s.Groups, Labels.StudentStatus(s.Status), s.Score, s.Target, s.Accuracy, s.Attendance })), "text/csv");
 
     private async Task CreateAsync()
     {

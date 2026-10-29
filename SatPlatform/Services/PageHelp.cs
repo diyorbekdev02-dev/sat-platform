@@ -157,7 +157,7 @@ public static class PageHelp
             S("Pastda", "<b>E'tibor talab qiladigan o'quvchilar</b> — ularni <b>Ochish</b> orqali progress panelida ko'rasiz.", "<b>So'nggi natijalar</b> — o'quvchi, guruh, ball, aniqlik va oxirgi faollik; <b>Barcha o'quvchilar →</b>.")),
 
         ["/teacher/groups"] = T("Guruhlar", "Sizga biriktirilgan guruhlar.",
-            S("Nima ko'rinadi", "Har guruh kartochkasida o'quvchilar soni, o'rtacha ball, aniqlik va davomat.", "Kartochkani bossangiz guruh sahifasi ochiladi."),
+            S("Nima ko'rinadi", "Jadvalda guruh nomi, o'qituvchi, kun, vaqt, xona, o'quvchilar soni, o'rtacha ball, aniqlik va davomat. Tepada qidiruv va filtrlar, <b>Export</b> — CSV fayl.", "Qatorni bossangiz guruh sahifasi ochiladi."),
             S("Bo'sh bo'lsa", "«Sizga hali guruh biriktirilmagan» — administrator guruhga sizni o'qituvchi (yoki assistent) qilib qo'shishi kerak.")),
 
         ["/teacher/groups/{id}"] = T("Guruh sahifasi", "Bitta guruhning barcha ma'lumotlari.",
@@ -177,9 +177,13 @@ public static class PageHelp
             S("Eslatma", "O'qituvchi o'quvchi javoblarini o'zgartira olmaydi, faqat ko'radi.")),
 
         ["/teacher/attendance"] = T("Davomat", "Dars davomatini belgilash.",
-            S("Qadamlar", "1) <b>Guruh</b> ni tanlang.  2) <b>Sana</b> — bugungi dars avtomatik tanlanadi.  3) Har o'quvchiga holat belgilang.  4) <b>Davomatni saqlash</b>."),
-            S("Holatlar", "<b>Keldi</b>, <b>Kelmadi</b>, <b>Kechikdi</b> (daqiqa yoziladi), <b>Sababli</b>. <b>Hammasi keldi</b> tugmasi hammani birdan belgilaydi."),
+            S("Qadamlar", "1) <b>Guruh</b> va <b>Oy</b> ni tanlang — jadvalda oyning barcha dars kunlari chiqadi.  2) Katakchani bosib holatni tanlang.  3) <b>Saqlash</b>."),
+            S("Holatlar", "<b>Keldi</b>, <b>Kechikdi</b>, <b>Sababli</b>, <b>Sababsiz</b>. Kun sarlavhasini bossangiz o'sha kuni hamma <b>Keldi</b> bo'ladi."),
             S("Bildirishnoma", "Saqlagach kelmagan va kechikkan o'quvchining <b>ota-onasiga Telegram orqali xabar</b> ketadi.")),
+
+        ["/teacher/schedule"] = T("Dars jadvali", "Guruhlarning kunlik dars jadvali, xonalar bo'yicha.",
+            S("Qanday ishlaydi", "Tepada kunni tanlang (Yak–Sha). Ustunlarda xonalar, qatorlarda 30 daqiqalik vaqtlar; dars bor joy rangli va guruh nomi yoziladi.", "Guruh nomini bossangiz guruh sahifasi ochiladi."),
+            S("Hafta", "<b>Hafta</b> — barcha guruhlar kunlari, vaqti, xonasi va o'qituvchisi bilan ro'yxat.")),
 
         ["/teacher/assign"] = T("Test tayinlash", "Chop etilgan testni guruh yoki o'quvchiga berish.",
             S("Yangi tayinlov", "<b>Test</b> — faqat chop etilgan testlar chiqadi.", "<b>Kimga</b> — <b>Guruh</b> yoki <b>Alohida o'quvchi</b>.", "<b>Boshlanish</b> va <b>Muddat</b> (ixtiyoriy); <b>Urinishlar soni</b> — bo'sh qoldirsangiz cheksiz.", "<b>Tayinlash</b> — o'quvchilarga bildirishnoma ketadi."),

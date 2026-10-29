@@ -450,3 +450,8 @@ select.input { appearance: auto; }
 .count-pill { border: 1px solid var(--border); border-radius: 8px; padding: 3px 10px; font-size: 12px; color: var(--muted); }
 .count-pill b { color: var(--text); }
 .table th.no, .table td.no { width: 44px; color: var(--muted); }
+.sched .time { width: 120px; color: var(--muted); white-space: nowrap; font-size: 13px; }
+.sched td, .sched th { text-align: center; border-left: 1px solid var(--border); }
+.sched td.time, .sched th.time { border-left: 0; text-align: left; }
+.sched td.busy { background: var(--accent-soft); }
+.sched td.busy a { color: var(--accent); text-decoration: none; }
