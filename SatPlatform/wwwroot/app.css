@@ -485,3 +485,6 @@ select.input { appearance: auto; }
 .tl-block b { color: var(--sc); font-size: 13px; }
 .tl-block span { color: var(--muted); }
 .tl-col.addable { cursor: cell; } .tl-col.addable:hover { background-color: var(--hover); }
+.table th.sortable { cursor: pointer; user-select: none; }
+.table th.sortable:hover { color: var(--text); }
+.sort-ind { display: inline-block; min-width: 14px; margin-left: 3px; font-size: 10px; color: var(--accent); }

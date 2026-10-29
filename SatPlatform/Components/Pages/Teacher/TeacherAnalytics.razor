@@ -27,9 +27,12 @@ else
         </div>
     </div>
     <div class="card mb pad-0">
-        <div class="card-title" style="padding:14px 16px 0"><h2>O'quvchilar</h2></div>
-        <div class="table-wrap"><table class="table"><thead><tr><th>O'quvchi</th><th>Guruh</th><th class="num">Ball</th><th class="num">Maqsad</th><th class="num">Aniqlik</th><th class="num">Testlar</th><th class="num">Mashqlar</th><th class="num">Davomat</th><th>Eng zaif</th></tr></thead>
-            <tbody>@foreach (var s in students.OrderBy(s => s.Accuracy ?? 101)) { <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/students/{s.StudentId}"))"><td class="bold">@s.Name</td><td>@s.Groups</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Target?.ToString() ?? "—")</td><td class="num @(s.Accuracy is < 50 ? "level-weak" : "")">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num">@s.Tests</td><td class="num">@s.Practices</td><td class="num">@(s.Attendance?.ToString() ?? "—")%</td><td>@(s.WeakestSkill is null ? "—" : $"{s.WeakestSkill} ({s.WeakestAccuracy}%)")</td></tr> }</tbody></table></div>
+        <div class="row between" style="padding:14px 16px 8px"><h2>O'quvchilar <span class="count-pill">Umumiy soni: <b>@SortedStudents.Count()</b></span></h2>
+            <div class="row"><input class="input sm" style="width:220px" placeholder="Qidiruv (ism yoki telefon)" @bind="studentSearch" @bind:event="oninput" /><button class="btn sm" @onclick="ExportStudentsAsync"><Icon Name="download" Size="16" /> Export</button></div></div>
+        <div class="table-wrap"><table class="table"><thead><tr><th class="no">№</th>
+            @foreach (var (key, label, num) in StudentCols) { <th class="sortable @(num ? "num" : "")" @onclick="() => SortBy(key)">@label<span class="sort-ind">@(sortKey == key ? (sortDesc ? "▼" : "▲") : "")</span></th> }</tr></thead>
+            <tbody>@foreach (var (s, n) in SortedStudents.Select((s, i) => (s, i + 1))) { <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/students/{s.StudentId}"))"><td class="no">@n</td><td class="bold">@s.Name</td><td>@s.Groups</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Target?.ToString() ?? "—")</td><td class="num @(s.Accuracy is < 50 ? "level-weak" : "")">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num">@s.Tests</td><td class="num">@s.Practices</td><td class="num @(s.Attendance is < 80 ? "level-weak" : "")">@(s.Attendance?.ToString() ?? "—")%</td><td>@(s.WeakestSkill is null ? "—" : $"{s.WeakestSkill} ({s.WeakestAccuracy}%)")</td></tr> }</tbody></table></div>
+        @if (!SortedStudents.Any()) { <div class="empty"><h3>O'quvchilar topilmadi</h3></div> }
     </div>
     @if (isAdmin)
     {
@@ -50,6 +53,34 @@ else
     private int groupId; private string section = "", qsort = "hardest";
     private bool isAdmin; private int uid; private UserRole role;
     private (int Weak, int Strong, int Min) thr;
+
+    private string studentSearch = "", sortKey = "accuracy";
+    private bool sortDesc;
+    private static readonly (string, string, bool)[] StudentCols = [("name", "O'quvchi", false), ("groups", "Guruh", false), ("score", "Ball", true), ("target", "Maqsad", true), ("accuracy", "Aniqlik", true), ("tests", "Testlar", true), ("practices", "Mashqlar", true), ("attendance", "Davomat", true), ("weak", "Eng zaif", false)];
+
+    private void SortBy(string key) { if (sortKey == key) sortDesc = !sortDesc; else { sortKey = key; sortDesc = key is "score" or "tests" or "practices" or "attendance" or "target"; } }
+
+    /// <summary>Filtered by name/phone and sorted by the chosen column; students without a value always go last.</summary>
+    private IEnumerable<AnalyticsService.StudentSummary> SortedStudents
+    {
+        get
+        {
+            var q = students.Where(s => string.IsNullOrWhiteSpace(studentSearch) || s.Name.Contains(studentSearch, StringComparison.OrdinalIgnoreCase) || PhoneFormat.Matches(s.Phone, studentSearch));
+            IEnumerable<AnalyticsService.StudentSummary> Num(Func<AnalyticsService.StudentSummary, double?> f) =>
+                (sortDesc ? q.OrderBy(s => f(s) is null).ThenByDescending(s => f(s)) : q.OrderBy(s => f(s) is null).ThenBy(s => f(s))).ThenBy(s => s.Name);
+            IEnumerable<AnalyticsService.StudentSummary> Txt(Func<AnalyticsService.StudentSummary, string?> f) =>
+                (sortDesc ? q.OrderByDescending(s => f(s) ?? "", StringComparer.CurrentCultureIgnoreCase) : q.OrderBy(s => f(s) ?? "", StringComparer.CurrentCultureIgnoreCase)).ThenBy(s => s.Name);
+            return sortKey switch
+            {
+                "name" => Txt(s => s.Name), "groups" => Txt(s => s.Groups), "weak" => Txt(s => s.WeakestSkill),
+                "score" => Num(s => s.Score), "target" => Num(s => s.Target), "accuracy" => Num(s => s.Accuracy), "tests" => Num(s => s.Tests),
+                "practices" => Num(s => s.Practices), "attendance" => Num(s => s.Attendance), _ => q
+            };
+        }
+    }
+
+    private async Task ExportStudentsAsync() => await JS.InvokeVoidAsync("sat.download", "tahlil-oquvchilar.csv", CsvExport.Build(["№", "O'quvchi", "Telefon", "Guruh", "Ball", "Maqsad", "Aniqlik %", "Testlar", "Mashqlar", "Davomat %", "Eng zaif"],
+        SortedStudents.Select((s, i) => new object?[] { i + 1, s.Name, s.Phone, s.Groups, s.Score, s.Target, s.Accuracy, s.Tests, s.Practices, s.Attendance, s.WeakestSkill })), "text/csv");
 
     protected override async Task OnInitializedAsync()
     {

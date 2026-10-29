@@ -207,6 +207,7 @@ public static class PageHelp
         ["/teacher/analytics"] = T("Tahlil", "Guruhlar va savollar bo'yicha chuqur tahlil.",
             S("Filtrlar", "<b>Guruh</b> (yoki Barcha guruhlar) va <b>Bo'lim</b> (Hammasi, Reading &amp; Writing, Math)."),
             S("Bo'limlar", "<b>Skilllar bo'yicha aniqlik</b> — qaysi mavzu zaif.", "<b>Guruhlar</b> jadvali: o'rtacha ball, aniqlik, davomat.", "<b>O'quvchilar</b> jadvali: ball, maqsad, testlar/mashqlar soni, <b>eng zaif</b> skill (eng zaiflar tepada)."),
+            S("O'quvchilar jadvalini saralash", "Ustun nomini bossangiz shu ustun bo'yicha saralanadi (▲ o'sish, ▼ kamayish); yana bossangiz tartib teskari bo'ladi. Qiymati yo'q o'quvchilar doim oxirida. Qidiruv ism yoki telefon bo'yicha; <b>Export</b> — ko'ringan tartibda CSV."),
             S("Savollar tahlili", "Kamida 5 ta urinish bo'lgan savollar: <b>eng qiyin</b>, <b>eng oson</b>, <b>eng sekin</b>, <b>eng ko'p ishlangan</b>. Skill, qiyinlik, urinishlar va o'rtacha vaqt ko'rinadi.", "Noto'g'ri ko'rinayotgan savol bo'lsa adminga #id ni ayting.")),
 
         // ================================================================ OTA-ONA

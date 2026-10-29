@@ -198,6 +198,14 @@ public class CrmPagesTests(BrowserFixture f)
         await page.ClickAsync("button:text-is(\"Ro'yxat\")");
         await page.WaitForSelectorAsync("tr:has-text('SAT Foundation B')");
 
+        // analytics: sortable student table
+        await page.GoAsync("/admin/analytics");
+        await page.WaitForSelectorAsync("th.sortable");
+        await page.ClickAsync("th.sortable:has-text('Ball')");
+        Assert.Contains("▼", await page.Locator("th.sortable:has-text('Ball')").InnerTextAsync());
+        await page.ClickAsync("th.sortable:has-text('Ball')");
+        Assert.Contains("▲", await page.Locator("th.sortable:has-text('Ball')").InnerTextAsync());
+
         // lead
         await page.GoAsync("/admin/leads");
         await page.ClickAsync("button:has-text('Lid qo')");
