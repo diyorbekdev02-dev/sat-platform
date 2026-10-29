@@ -10,14 +10,20 @@
 @if (Loading) { <div class="loading"><span class="spinner"></span></div> }
 else
 {
-    <div class="row between mb"><label class="check"><input type="checkbox" @bind="showInactive" @bind:after="LoadAsync" /> Nofaol guruhlarni ko'rsatish</label><button class="btn primary" @onclick="() => Open(null)"><Icon Name="plus" /> Guruh yaratish</button></div>
-    <div class="card pad-0"><div class="table-wrap"><table class="table">
-        <thead><tr><th>Nomi</th><th>Kurs</th><th>O'qituvchi</th><th>Assistent</th><th>Jadval</th><th>Xona</th><th class="num">O'quvchilar</th><th class="num">O'rt. ball</th><th>Holat</th><th></th></tr></thead>
-        <tbody>@foreach (var g in groups)
+    <div class="row between mb"><h2 class="grow">Guruhlar</h2><button class="btn primary" @onclick="() => Open(null)"><Icon Name="plus" /> Guruh yaratish</button></div>
+    <div class="filters">
+        <input class="input sm" placeholder="Qidiruv (guruh nomi)" @bind="search" @bind:event="oninput" />
+        <select class="input sm" @bind="teacherFilter"><option value="">Barcha o'qituvchilar</option>@foreach (var t in teachers) { <option value="@t.Id">@t.FullName</option> }</select>
+        <select class="input sm" @bind="dayFilter"><option value="">Barcha kunlar</option>@for (var i = 1; i <= 7; i++) { <option value="@i">@Labels.Days(i.ToString())</option> }</select>
+        <label class="check"><input type="checkbox" @bind="showInactive" @bind:after="LoadAsync" /> Nofaol guruhlar</label>
+    </div>
+    <div class="card pad-0"><div class="list-head"><span class="count-pill">Umumiy soni: <b>@Filtered.Count()</b></span></div><div class="table-wrap"><table class="table">
+        <thead><tr><th class="no">№</th><th>Nomi</th><th>Kurs</th><th>O'qituvchi</th><th>Assistent</th><th>Jadval</th><th>Xona</th><th class="num">O'quvchilar</th><th class="num">O'rt. ball</th><th>Holat</th><th></th></tr></thead>
+        <tbody>@foreach (var (g, n) in Filtered.Select((g, i) => (g, i + 1)))
         {
             var p = perf.FirstOrDefault(x => x.GroupId == g.Id);
-            <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/groups/{g.Id}"))"><td class="bold">@g.Name</td><td>@g.CourseType</td><td>@(g.TeacherUser?.FullName ?? "—")</td><td>@(g.AssistantUser?.FullName ?? "—")</td><td>@Labels.Days(g.ScheduleDays) @g.StartTime?.ToString("HH:mm")–@g.EndTime?.ToString("HH:mm")</td><td>@g.Room</td><td class="num">@g.Enrollments.Count</td><td class="num">@(p?.AvgScore?.ToString() ?? "—")</td><td><span class="badge @(g.IsActive ? "ok" : "")">@(g.IsActive ? "Faol" : "Nofaol")</span></td><td><button class="btn sm" @onclick="() => Open(g)" @onclick:stopPropagation="true"><Icon Name="pencil" Size="14" /></button></td></tr>
-        }</tbody></table></div>@if (groups.Count == 0) { <div class="empty"><h3>Guruhlar yo'q</h3></div> }</div>
+            <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/groups/{g.Id}"))"><td class="no">@n</td><td class="bold">@g.Name</td><td>@g.CourseType</td><td>@(g.TeacherUser?.FullName ?? "—")</td><td>@(g.AssistantUser?.FullName ?? "—")</td><td>@Labels.Days(g.ScheduleDays) @g.StartTime?.ToString("HH:mm")–@g.EndTime?.ToString("HH:mm")</td><td>@g.Room</td><td class="num">@g.Enrollments.Count</td><td class="num">@(p?.AvgScore?.ToString() ?? "—")</td><td><span class="badge @(g.IsActive ? "ok" : "")">@(g.IsActive ? "Faol" : "Nofaol")</span></td><td><button class="btn sm" @onclick="() => Open(g)" @onclick:stopPropagation="true"><Icon Name="pencil" Size="14" /></button></td></tr>
+        }</tbody></table></div>@if (!Filtered.Any()) { <div class="empty"><h3>Guruhlar yo'q</h3></div> }</div>
 
     <Modal Open="editing is not null" OpenChanged="v => { if (!v) editing = null; }" Title="@(editing?.Id > 0 ? "Guruhni tahrirlash" : "Yangi guruh")" Wide="true">
         @if (editing is not null)
@@ -55,6 +61,11 @@ else
     private Group? editing;
     private readonly HashSet<int> days = [];
     private bool showInactive, busy;
+    private string search = "", teacherFilter = "", dayFilter = "";
+    private IEnumerable<Group> Filtered => groups.Where(g =>
+        (string.IsNullOrWhiteSpace(search) || g.Name.Contains(search, StringComparison.OrdinalIgnoreCase)) &&
+        (teacherFilter == "" || g.TeacherUserId.ToString() == teacherFilter) &&
+        (dayFilter == "" || g.ScheduleDays.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains(dayFilter)));
     private int enrollStudent;
 
     protected override async Task OnInitializedAsync()

@@ -443,3 +443,10 @@ select.input { appearance: auto; }
 .att-grid th.nm { z-index: 3; background: var(--bg); }
 .att-grid th { white-space: nowrap; }
 .att-grid td:not(.nm), .att-grid th:not(.nm) { min-width: 52px; }
+
+/* CRM list pages: filter panel + counted table */
+.filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; margin-bottom: 14px; align-items: center; }
+.list-head { display: flex; justify-content: flex-end; align-items: center; padding: 12px 16px 4px; }
+.count-pill { border: 1px solid var(--border); border-radius: 8px; padding: 3px 10px; font-size: 12px; color: var(--muted); }
+.count-pill b { color: var(--text); }
+.table th.no, .table td.no { width: 44px; color: var(--muted); }

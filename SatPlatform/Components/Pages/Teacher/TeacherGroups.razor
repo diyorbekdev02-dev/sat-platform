@@ -10,22 +10,37 @@
 else if (perf.Count == 0) { <div class="card"><div class="empty"><div class="big">👥</div><h3>Guruhlar yo'q</h3><p class="small">Sizga hali guruh biriktirilmagan.</p></div></div> }
 else
 {
-    <div class="grid c2">
-        @foreach (var g in perf)
-        {
-            var group = groups.First(x => x.Id == g.GroupId);
-            <a class="card" href="/teacher/groups/@g.GroupId" style="text-decoration:none">
-                <div class="row between"><h2>@g.Group</h2><span class="badge">@g.Students o'quvchi</span></div>
-                <div class="small muted mt-s">@(g.Teacher ?? "O'qituvchi biriktirilmagan") · @Labels.Days(group.ScheduleDays) @group.StartTime?.ToString("HH:mm")–@group.EndTime?.ToString("HH:mm") · xona @(group.Room ?? "—")</div>
-                <div class="row mt-s"><span class="badge accent">O'rtacha ball @(g.AvgScore?.ToString() ?? "—")</span><span class="badge">Aniqlik @(g.AvgAccuracy?.ToString() ?? "—")%</span><span class="badge @(g.Attendance is < 80 ? "danger" : "ok")">Davomat @(g.Attendance?.ToString() ?? "—")%</span></div>
-            </a>
-        }
+    <div class="filters">
+        <input class="input sm" placeholder="Qidiruv (guruh nomi)" @bind="search" @bind:event="oninput" />
+        <select class="input sm" @bind="teacherFilter"><option value="">Barcha o'qituvchilar</option>@foreach (var t in perf.Select(p => p.Teacher).Where(t => t is not null).Distinct().Order()) { <option value="@t">@t</option> }</select>
+        <select class="input sm" @bind="dayFilter"><option value="">Barcha kunlar</option>@for (var i = 1; i <= 7; i++) { <option value="@i">@Labels.Days(i.ToString())</option> }</select>
+    </div>
+    <div class="card pad-0">
+        <div class="list-head"><span class="count-pill">Umumiy soni: <b>@Filtered.Count()</b></span></div>
+        <div class="table-wrap"><table class="table">
+            <thead><tr><th class="no">№</th><th>Guruh nomi</th><th>O'qituvchi</th><th>Kun</th><th>Dars vaqti</th><th>Xona</th><th class="num">O'quvchilar</th><th class="num">O'rt. ball</th><th class="num">Aniqlik</th><th class="num">Davomat</th></tr></thead>
+            <tbody>@foreach (var (g, n) in Filtered.Select((g, i) => (g, i + 1)))
+            {
+                var group = groups.First(x => x.Id == g.GroupId);
+                <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/groups/{g.GroupId}"))">
+                    <td class="no">@n</td><td class="bold">@g.Group</td><td>@(g.Teacher ?? "—")</td><td>@Labels.Days(group.ScheduleDays)</td><td>@group.StartTime?.ToString("HH:mm")–@group.EndTime?.ToString("HH:mm")</td><td>@(group.Room ?? "—")</td>
+                    <td class="num">@g.Students</td><td class="num bold">@(g.AvgScore?.ToString() ?? "—")</td><td class="num">@(g.AvgAccuracy?.ToString() ?? "—")%</td><td class="num @(g.Attendance is < 80 ? "level-weak" : "")">@(g.Attendance?.ToString() ?? "—")%</td>
+                </tr>
+            }</tbody></table></div>
+        @if (!Filtered.Any()) { <div class="empty"><h3>Guruh topilmadi</h3></div> }
     </div>
 }
 
 @code {
     private List<Group> groups = [];
     private List<AnalyticsService.GroupPerf> perf = [];
+    private string search = "", teacherFilter = "", dayFilter = "";
+
+    private IEnumerable<AnalyticsService.GroupPerf> Filtered => perf.Where(g =>
+        (string.IsNullOrWhiteSpace(search) || g.Group.Contains(search, StringComparison.OrdinalIgnoreCase)) &&
+        (teacherFilter == "" || g.Teacher == teacherFilter) &&
+        (dayFilter == "" || groups.First(x => x.Id == g.GroupId).ScheduleDays.Split(',', StringSplitOptions.RemoveEmptyEntries).Contains(dayFilter)));
+
     protected override async Task OnInitializedAsync()
     {
         SetTitle("Guruhlar");

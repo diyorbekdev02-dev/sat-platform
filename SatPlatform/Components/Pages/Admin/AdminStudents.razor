@@ -9,21 +9,19 @@
 @if (Loading) { <div class="loading"><span class="spinner"></span></div> }
 else
 {
-    <div class="row between mb">
-        <div class="row">
-            <input class="input sm" style="width:240px" placeholder="Ism yoki telefon" @bind="search" @bind:event="oninput" />
+    <div class="row between mb"><h2 class="grow">O'quvchilar</h2><button class="btn primary" @onclick="() => createOpen = true"><Icon Name="plus" /> O'quvchi qo'shish</button></div>
+    <div class="filters">
+        <input class="input sm" placeholder="Qidiruv (ism yoki telefon)" @bind="search" @bind:event="oninput" />
             <select class="input sm" @bind="status"><option value="">Barcha holatlar</option>@foreach (var s in Enum.GetValues<StudentStatus>()) { <option value="@s">@Labels.StudentStatus(s)</option> }</select>
             <select class="input sm" @bind="groupId"><option value="0">Barcha guruhlar</option>@foreach (var g in groups) { <option value="@g.Id">@g.Name</option> }</select>
             <select class="input sm" @bind="scoreBand"><option value="">Ball</option><option value="none">Ballsiz</option><option value="lt1000">&lt; 1000</option><option value="1000-1200">1000–1200</option><option value="1200-1400">1200–1400</option><option value="gt1400">&gt; 1400</option></select>
-        </div>
-        <button class="btn primary" @onclick="() => createOpen = true"><Icon Name="plus" /> O'quvchi qo'shish</button>
     </div>
-    <div class="card pad-0"><div class="table-wrap"><table class="table">
-        <thead><tr><th>Ism</th><th>Telefon</th><th>Guruh</th><th>Holat</th><th class="num">Ball</th><th class="num">Maqsad</th><th class="num">Aniqlik</th><th class="num">Davomat</th><th>Oxirgi faollik</th><th></th></tr></thead>
-        <tbody>@foreach (var s in Filtered)
+    <div class="card pad-0"><div class="list-head"><span class="count-pill">Umumiy soni: <b>@Filtered.Count()</b></span></div><div class="table-wrap"><table class="table">
+        <thead><tr><th class="no">№</th><th>Ism</th><th>Telefon</th><th>Guruh</th><th>Holat</th><th class="num">Ball</th><th class="num">Maqsad</th><th class="num">Aniqlik</th><th class="num">Davomat</th><th>Oxirgi faollik</th><th></th></tr></thead>
+        <tbody>@foreach (var (s, n) in Filtered.Select((s, i) => (s, i + 1)))
         {
             <tr class="click" @onclick="@(() => Nav.NavigateTo($"/admin/students/{s.StudentId}"))">
-                <td class="bold">@s.Name</td><td><PhoneLink Value="@s.Phone" /></td><td>@s.Groups</td><td><span class="badge @(s.Status == StudentStatus.Active ? "ok" : "")">@Labels.StudentStatus(s.Status)</span></td>
+                <td class="no">@n</td><td class="bold">@s.Name</td><td><PhoneLink Value="@s.Phone" /></td><td>@s.Groups</td><td><span class="badge @(s.Status == StudentStatus.Active ? "ok" : "")">@Labels.StudentStatus(s.Status)</span></td>
                 <td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num">@(s.Target?.ToString() ?? "—")</td><td class="num">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num">@(s.Attendance?.ToString() ?? "—")%</td><td>@Tz.Fmt(s.LastActive)</td>
                 <td><a class="btn sm" href="/admin/students/@s.StudentId">Ochish</a></td>
             </tr>

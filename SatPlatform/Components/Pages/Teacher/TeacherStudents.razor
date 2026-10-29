@@ -9,31 +9,35 @@
 @if (Loading) { <div class="loading"><span class="spinner"></span></div> }
 else
 {
+    <div class="filters">
+        <input class="input sm" placeholder="Qidiruv (ism yoki telefon)" @bind="search" @bind:event="oninput" />
+        <select class="input sm" @bind="groupFilter"><option value="">Barcha guruhlar</option>@foreach (var g in GroupNames) { <option value="@g">@g</option> }</select>
+    </div>
     <div class="row between mb">
-        <input class="input" style="max-width:320px" placeholder="Ism yoki telefon bo'yicha qidirish" @bind="search" @bind:event="oninput" />
         <div class="chips"><button class="chip @(sort == "name" ? "active" : "")" @onclick="@(() => sort = "name")">Ism</button><button class="chip @(sort == "score" ? "active" : "")" @onclick="@(() => sort = "score")">Ball</button><button class="chip @(sort == "weak" ? "active" : "")" @onclick="@(() => sort = "weak")">Eng zaif</button><button class="chip @(sort == "active" ? "active" : "")" @onclick="@(() => sort = "active")">Faollik</button></div>
     </div>
-    <div class="card pad-0"><div class="table-wrap"><table class="table">
-        <thead><tr><th>Ism</th><th>Guruh</th><th class="num">Ball</th><th class="num">Aniqlik</th><th class="num">Davomat</th><th>Eng zaif skill</th><th>Oxirgi faollik</th><th></th></tr></thead>
-        <tbody>@foreach (var s in Sorted)
+    <div class="card pad-0"><div class="list-head"><span class="count-pill">Umumiy soni: <b>@Sorted.Count()</b></span></div><div class="table-wrap"><table class="table">
+        <thead><tr><th class="no">№</th><th>Ism</th><th>Guruh</th><th class="num">Ball</th><th class="num">Aniqlik</th><th class="num">Davomat</th><th>Eng zaif skill</th><th>Oxirgi faollik</th><th></th></tr></thead>
+        <tbody>@foreach (var (s, n) in Sorted.Select((s, i) => (s, i + 1)))
         {
             <tr class="click" @onclick="@(() => Nav.NavigateTo($"/teacher/students/{s.StudentId}"))">
-                <td class="bold">@s.Name<div class="tiny muted"><PhoneLink Value="@s.Phone" /></div></td><td>@s.Groups</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num @(s.Accuracy is < 50 ? "level-weak" : "")">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num @(s.Attendance is < 80 ? "level-weak" : "")">@(s.Attendance?.ToString() ?? "—")%</td>
+                <td class="no">@n</td><td class="bold">@s.Name<div class="tiny muted"><PhoneLink Value="@s.Phone" /></div></td><td>@s.Groups</td><td class="num bold">@(s.Score?.ToString() ?? "—")</td><td class="num @(s.Accuracy is < 50 ? "level-weak" : "")">@(s.Accuracy?.ToString() ?? "—")%</td><td class="num @(s.Attendance is < 80 ? "level-weak" : "")">@(s.Attendance?.ToString() ?? "—")%</td>
                 <td>@(s.WeakestSkill is null ? "—" : $"{s.WeakestSkill} ({s.WeakestAccuracy}%)")</td><td>@Tz.Fmt(s.LastActive)</td><td><a class="btn sm" href="/teacher/students/@s.StudentId">Ochish</a></td>
             </tr>
         }</tbody></table></div>
-        @if (students.Count == 0) { <div class="empty"><h3>O'quvchilar yo'q</h3></div> }
+        @if (!Sorted.Any()) { <div class="empty"><h3>O'quvchilar yo'q</h3></div> }
     </div>
 }
 
 @code {
     private List<AnalyticsService.StudentSummary> students = [];
-    private string search = "", sort = "name";
+    private string search = "", sort = "name", groupFilter = "";
+    private IEnumerable<string> GroupNames => students.SelectMany(s => s.Groups.Split(", ", StringSplitOptions.RemoveEmptyEntries)).Distinct().Order();
     private IEnumerable<AnalyticsService.StudentSummary> Sorted
     {
         get
         {
-            var q = students.Where(s => string.IsNullOrWhiteSpace(search) || s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || PhoneFormat.Matches(s.Phone, search));
+            var q = students.Where(s => (groupFilter == "" || s.Groups.Split(", ").Contains(groupFilter)) && (string.IsNullOrWhiteSpace(search) || s.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || PhoneFormat.Matches(s.Phone, search)));
             return sort switch { "score" => q.OrderByDescending(s => s.Score ?? 0), "weak" => q.OrderBy(s => s.Accuracy ?? 101), "active" => q.OrderByDescending(s => s.LastActive), _ => q.OrderBy(s => s.Name) };
         }
     }
