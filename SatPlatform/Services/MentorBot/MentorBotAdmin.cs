@@ -9,7 +9,7 @@ public record BotMessageRow(long Id, long ChatId, string ChatName, bool Incoming
 public record BotQuestionRow(int Id, MentorQuestionKind Kind, string Name, UserRole? Role, string Text, bool HasFile, string? Answer, string? AnsweredBy, DateTime CreatedAt, DateTime? AnsweredAt);
 public record BotBroadcastRow(int Id, BroadcastTarget Target, string? Group, string Text, string Author, DateTime CreatedAt, DateTime? ScheduledAt, DateTime? SentAt, int SentCount);
 public record BotStats(int Chats, int Students, int Parents, int Staff, int Unlinked, int Messages24h, int OpenQuestions, int Scheduled, int QuizToday);
-public record BotRoleRow(int UserId, string Name, string Phone, UserRole SiteRole, UserRole? BotRole, bool CanUseSite, bool IsActive, bool InBot);
+public record BotRoleRow(int UserId, string Name, string Phone, UserRole SiteRole, UserRole? BotRole, bool CanUseSite, bool IsActive, bool InBot, bool CanManagePdfs);
 
 /// <summary>Data and actions for the admin "Bot" page: monitoring, the web admin panel (same actions as in the bot) and bot roles.</summary>
 public class MentorBotAdmin(
@@ -226,9 +226,9 @@ public class MentorBotAdmin(
         await using var db = await factory.CreateDbContextAsync();
         var inBot = await db.MentorBotChats.Where(c => c.UserId != null).Select(c => c.UserId!.Value).Distinct().ToListAsync();
         var users = await db.Users.AsNoTracking()
-            .Where(u => u.BotRole != null || !u.CanUseSite || inBot.Contains(u.Id) || u.Role == UserRole.Admin || u.Role == UserRole.SuperAdmin || u.Role == UserRole.Teacher || u.Role == UserRole.Assistant)
+            .Where(u => u.BotRole != null || u.CanManageBotPdfs || !u.CanUseSite || inBot.Contains(u.Id) || u.Role == UserRole.Admin || u.Role == UserRole.SuperAdmin || u.Role == UserRole.Teacher || u.Role == UserRole.Assistant)
             .OrderBy(u => u.Role).ThenBy(u => u.FullName).ToListAsync();
-        return users.Select(u => new BotRoleRow(u.Id, u.FullName, u.Phone, u.Role, u.BotRole, u.CanUseSite, u.IsActive, inBot.Contains(u.Id))).ToList();
+        return users.Select(u => new BotRoleRow(u.Id, u.FullName, u.Phone, u.Role, u.BotRole, u.CanUseSite, u.IsActive, inBot.Contains(u.Id), u.Role == UserRole.SuperAdmin || u.CanManageBotPdfs)).ToList();
     }
 
     public async Task<string?> SetBotRoleAsync(int targetUserId, UserRole? role, int actorId, bool actorIsSuperAdmin)
@@ -258,6 +258,21 @@ public class MentorBotAdmin(
         await db.SaveChangesAsync();
         SiteAccessCache.Invalidate(u.Id);
         await audit.LogAsync(actorId, "SiteAccessChanged", "User", u.Id, canUseSite ? "ochildi" : "yopildi");
+        return null;
+    }
+
+    /// <summary>Permission to add / edit PDFs in the bot library. Only a super admin can grant or take it.</summary>
+    public async Task<string?> SetPdfPermissionAsync(int targetUserId, bool allowed, int actorId, bool actorIsSuperAdmin)
+    {
+        if (!actorIsSuperAdmin) return "PDF ruxsatini faqat super admin beradi.";
+        await using var db = await factory.CreateDbContextAsync();
+        var u = await db.Users.FindAsync(targetUserId);
+        if (u is null) return "Foydalanuvchi topilmadi.";
+        if (u.Role == UserRole.SuperAdmin) return "Super admin PDF qo'sha oladi — bu ruxsatni olib bo'lmaydi.";
+        u.CanManageBotPdfs = allowed;
+        await db.SaveChangesAsync();
+        await audit.LogAsync(actorId, "BotPdfPermission", "User", u.Id, allowed ? "berildi" : "olindi");
+        if (allowed) await sender.SendToUserAsync(u.Id, "📚 Sizga botdagi kutubxonaga <b>PDF qo'shish va o'zgartirish</b> ruxsati berildi. «📚 Materiallar» → «➕ PDF qo'shish».");
         return null;
     }
 

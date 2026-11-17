@@ -143,12 +143,12 @@ public partial class MentorBotService
     }
 
     /// <summary>Downloads the photo/document of the current message and stores it as a MediaFile.</summary>
-    private async Task<(int? Id, string? Error)> SaveTelegramFileAsync(Ctx c)
+    private async Task<(int? Id, string? Error)> SaveTelegramFileAsync(Ctx c, string? forceMime = null)
     {
         if (c.U.FileSize > 20 * 1024 * 1024) return (null, "Fayl 20 MB dan katta.");
         var data = await client.DownloadAsync(c.U.FileId!, c.Ct);
         if (data is null) return (null, "Faylni yuklab bo'lmadi, qaytadan yuboring.");
-        var mime = c.U.MimeType ?? "application/octet-stream";
+        var mime = forceMime ?? c.U.MimeType ?? "application/octet-stream";
         using var ms = new MemoryStream(data);
         var (_, id, err) = await media.UploadAsync(ms, c.U.FileName ?? "fayl", mime, data.Length, c.User!.Id, imagesOnly: false);
         return (id, err);
@@ -275,9 +275,17 @@ public partial class MentorBotService
         var list = await materials.ListAsync(null, groupIds);
         if (!string.IsNullOrWhiteSpace(search))
             list = list.Where(m => m.Title.Contains(search, StringComparison.OrdinalIgnoreCase) || (m.Description ?? "").Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (list.Count == 0) { await Say(c, search is null ? "📚 Kutubxona hozircha bo'sh." : "🔎 Hech narsa topilmadi.", Inline([new B("🔎 Qidirish", "msr")])); return; }
+        var canPdf = await CanManagePdfAsync(c);
+        if (list.Count == 0)
+        {
+            var empty = new List<B> { new("🔎 Qidirish", "msr") };
+            if (canPdf) empty.Insert(0, new B("➕ PDF qo'shish", "pdfadd"));
+            await Say(c, search is null ? "📚 Kutubxona hozircha bo'sh." : "🔎 Hech narsa topilmadi.", Column(empty));
+            return;
+        }
         var buttons = list.Take(30).Select(m => new B($"{(m.FileId is not null ? "📎" : "🔗")} {Cut(m.Title, 40)} · {Labels.Material(m.Category)}", $"m:{m.Id}")).ToList();
         buttons.Add(new B("🔎 Qidirish", "msr"));
+        if (canPdf) buttons.Add(new B("➕ PDF qo'shish", "pdfadd"));
         await Say(c, search is null ? $"📚 <b>Materiallar</b> ({list.Count})" : $"🔎 «{H(search)}» bo'yicha: {list.Count}", Column(buttons));
     }
 
@@ -301,6 +309,7 @@ public partial class MentorBotService
         var caption = $"📚 <b>{H(m.Title)}</b>" + (string.IsNullOrWhiteSpace(m.Description) ? "" : $"\n{H(m.Description)}");
         if (m.FileId is int fid) await SendMediaFileAsync(c, fid, caption);
         if (m.ExternalUrl is not null) await Say(c, caption + $"\n🔗 {H(m.ExternalUrl)}");
+        if (await CanManagePdfAsync(c)) await Say(c, $"⚙️ <b>{H(m.Title)}</b> — boshqarish", PdfEditKeyboard(m.Id));
     }
 
     // ---------------------------------------------------------------- mini test

@@ -20,6 +20,8 @@ public class User
     public UserRole? BotRole { get; set; }
     /// <summary>false = Telegram-bot-only account (cannot sign in to the site).</summary>
     public bool CanUseSite { get; set; } = true;
+    /// <summary>May add / edit / delete PDFs in the mentor-bot library (super admins always can; granted by a super admin).</summary>
+    public bool CanManageBotPdfs { get; set; }
     public bool NotifyTestResults { get; set; } = true;
     public bool NotifyAttendance { get; set; } = true;
     public bool NotifyHomework { get; set; } = true;

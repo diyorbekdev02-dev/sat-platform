@@ -349,6 +349,91 @@ public class MentorBotTests(EngineFixture f)
         Assert.NotNull((await admin.BroadcastAsync(BroadcastTarget.Group, null, "x", null, f.AdminId)).Error);
     }
 
+    private Task Pdf(long chat, string name = "algebra.pdf", string? caption = null) => Bot.HandleAsync(new BotUpdate { UpdateId = _update++, ChatId = chat, FromId = chat, PrivateChat = true, MessageId = _update,
+        Text = caption, FileId = "PDF1", FileName = name, MimeType = "application/pdf", FileSize = 14, MediaKind = "document" }, default);
+
+    [Fact]
+    public async Task Pdf_library_super_admin_and_granted_users_manage_everyone_sees()
+    {
+        if (!f.Available) return;
+        Configure();
+        var admin = Get<MentorBotAdmin>();
+        const long super = 700701, teacher = 700702, student = 700703, parent = 700704;
+        await LinkAsync(super, "+998900000000");
+        await LinkAsync(teacher, "+998901111111");
+        await LinkAsync(student, "+998902000005");
+        await LinkAsync(parent, "+998903000000");
+
+        // super admin adds a PDF
+        await Text(super, "📚 Materiallar");
+        Assert.Contains("pdfadd", Tg.LastButtons(super));
+        await Press(super, "pdfadd");
+        await Text(super, "matn");                            // not a PDF → asked again
+        Assert.Contains("PDF", Tg.LastText(super));
+        await Pdf(super, "Algebra formulalari.pdf", "1-bob");
+        await Text(super, "-");                               // keep the file name
+        await Press(super, $"pdfcat:{(int)MaterialCategory.Math}");
+        await using var db = await DbAsync();
+        var m = await db.Materials.Include(x => x.File).OrderByDescending(x => x.Id).FirstAsync();
+        Assert.Equal("Algebra formulalari", m.Title);
+        Assert.Equal("1-bob", m.Description);
+        Assert.Equal(MaterialCategory.Math, m.Category);
+        Assert.Null(m.GroupId);
+        Assert.Equal("application/pdf", m.File!.ContentType);
+
+        // everyone sees it; only managers get the add / edit buttons
+        foreach (var chat in new[] { student, parent, teacher })
+        {
+            await Text(chat, "📚 Materiallar");
+            Assert.Contains($"m:{m.Id}", Tg.LastButtons(chat));
+            Assert.DoesNotContain("pdfadd", Tg.LastButtons(chat));
+        }
+        Tg.Clear();
+        await Press(student, $"m:{m.Id}");
+        Assert.Contains(Tg.Calls, c => c.Method == "sendDocument");
+        Assert.DoesNotContain($"pdfd:{m.Id}", Tg.LastButtons(student));
+        await Press(student, $"pdfd:{m.Id}");
+        await Press(student, $"pdfdd:{m.Id}");
+        Assert.True(await db.Materials.AnyAsync(x => x.Id == m.Id));   // student cannot delete
+
+        // only a super admin grants the permission
+        var t = await db.Users.FirstAsync(u => u.Phone == "+998901111111");
+        Assert.NotNull(await admin.SetPdfPermissionAsync(t.Id, true, t.Id, actorIsSuperAdmin: false));
+        Assert.Null(await admin.SetPdfPermissionAsync(t.Id, true, f.AdminId, actorIsSuperAdmin: true));
+
+        // the granted teacher renames, re-categorises and replaces the file
+        await Text(teacher, "📚 Materiallar");
+        Assert.Contains("pdfadd", Tg.LastButtons(teacher));
+        await Press(teacher, $"pdfr:{m.Id}");
+        await Text(teacher, "Algebra — barcha formulalar");
+        await Press(teacher, $"pdfc:{m.Id}");
+        await Press(teacher, $"pdfcat:{(int)MaterialCategory.Practice}");
+        var oldFile = m.FileId;
+        await Press(teacher, $"pdff:{m.Id}");
+        await Pdf(teacher, "yangi.pdf");
+        await using (var db2 = await DbAsync())
+        {
+            var e = await db2.Materials.FirstAsync(x => x.Id == m.Id);
+            Assert.Equal("Algebra — barcha formulalar", e.Title);
+            Assert.Equal(MaterialCategory.Practice, e.Category);
+            Assert.NotEqual(oldFile, e.FileId);
+            Assert.False(await db2.MediaFiles.AnyAsync(x => x.Id == oldFile));
+        }
+
+        // announce to everyone, then the permission is taken back
+        Tg.Clear();
+        await Press(teacher, $"pdfann:{m.Id}");
+        Assert.Contains(Tg.Sent(student), c => (c.Body?["text"]?.GetValue<string>() ?? "").Contains("Kutubxonaga yangi material"));
+        Assert.Null(await admin.SetPdfPermissionAsync(t.Id, false, f.AdminId, actorIsSuperAdmin: true));
+        await Press(teacher, $"pdfd:{m.Id}");
+        Assert.Contains("faqat super admin", Tg.LastText(teacher));
+
+        // super admin deletes
+        await Press(super, $"pdfd:{m.Id}");
+        await Press(super, $"pdfdd:{m.Id}");
+        await using (var db3 = await DbAsync()) Assert.False(await db3.Materials.AnyAsync(x => x.Id == m.Id));
+    }
+
     [Fact]
     public async Task Teacher_cannot_touch_other_groups_and_students_cannot_use_admin_actions()
     {

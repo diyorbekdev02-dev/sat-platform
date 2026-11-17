@@ -1933,6 +1933,9 @@ namespace SatPlatform.Migrations
                     b.Property<int?>("BotRole")
                         .HasColumnType("integer");
 
+                    b.Property<bool>("CanManageBotPdfs")
+                        .HasColumnType("boolean");
+
                     b.Property<bool>("CanManageQuestions")
                         .HasColumnType("boolean");
 

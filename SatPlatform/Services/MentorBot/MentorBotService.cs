@@ -42,9 +42,9 @@ public partial class MentorBotService(
     private static object Reply(params string[][] rows) => new { keyboard = rows.Select(r => r.Select(t => new { text = t })), resize_keyboard = true, is_persistent = true };
 
     private static readonly object StudentMenu = Reply([BtnSchedule, BtnHomework], [BtnResults, BtnQuiz], [BtnMaterials, BtnAsk], [BtnPayment, BtnHelp]);
-    private static readonly object ParentMenu = Reply([BtnChild, BtnSchedule], [BtnPayment, BtnAsk], [BtnHelp]);
-    private static readonly object StaffMenu = Reply([BtnGroups, BtnAttendance], [BtnNewHw, BtnSubmissions], [BtnBroadcast, BtnInbox], [BtnNewStudents, BtnDebtors], [BtnRisk, BtnReport]);
-    private static readonly object TeacherMenu = Reply([BtnGroups, BtnAttendance], [BtnNewHw, BtnSubmissions], [BtnBroadcast, BtnInbox], [BtnRisk, BtnReport]);
+    private static readonly object ParentMenu = Reply([BtnChild, BtnSchedule], [BtnPayment, BtnAsk], [BtnMaterials, BtnHelp]);
+    private static readonly object StaffMenu = Reply([BtnGroups, BtnAttendance], [BtnNewHw, BtnSubmissions], [BtnBroadcast, BtnInbox], [BtnNewStudents, BtnDebtors], [BtnRisk, BtnReport], [BtnMaterials]);
+    private static readonly object TeacherMenu = Reply([BtnGroups, BtnAttendance], [BtnNewHw, BtnSubmissions], [BtnBroadcast, BtnInbox], [BtnRisk, BtnReport], [BtnMaterials]);
     private static readonly object ContactKeyboard = new { keyboard = new[] { new[] { new { text = "📱 Telefon raqamni yuborish", request_contact = true } } }, resize_keyboard = true, one_time_keyboard = true };
     private static readonly object RemoveKeyboard = new { remove_keyboard = true };
 
@@ -278,6 +278,7 @@ public partial class MentorBotService(
         if (IsMenuText(t) || t.StartsWith('/')) { c.Chat.Step = ""; c.Chat.Data = null; await c.Db.SaveChangesAsync(c.Ct); }
 
         var cmd = t.Split(' ', 2)[0].ToLowerInvariant();
+        if (t == BtnMaterials || cmd == "/materiallar") { await MaterialsAsync(c, null); return; }
         if (IsStaff(c.User))
         {
             switch (t)
@@ -335,6 +336,7 @@ public partial class MentorBotService(
         "ask" or "receipt" => await AskReceiveAsync(c),
         "sub" => await SubmitReceiveAsync(c),
         "msearch" => await MaterialsSearchAsync(c),
+        _ when c.Chat.Step.StartsWith("pdf_") => await PdfStepAsync(c),
         _ when c.Chat.Step.StartsWith("s_") && IsStaff(c.User) => await StaffStepAsync(c),
         _ => false
     };
@@ -359,6 +361,7 @@ public partial class MentorBotService(
             case "sh": await StudentHomeworkDetailAsync(c, I(1)); return;
             case "sb": await SubmitStartAsync(c, I(1)); return;
             case "m": await MaterialSendAsync(c, I(1)); return;
+            case "pdfadd" or "pdfe" or "pdfr" or "pdff" or "pdfc" or "pdfcat" or "pdfd" or "pdfdd" or "pdfann": await PdfCallbackAsync(c, p); return;
             case "msr": await c.StepAsync("msearch", true); await Say(c, "🔎 Qidiruv so'zini yozing (masalan: <i>kvadrat tenglama</i>):"); return;
             case "qs": await QuizBeginAsync(c, p.Length > 1 ? p[1] : "x"); return;
             case "qz": await QuizAnswerAsync(c, I(1), p.Length > 2 ? p[2] : ""); return;

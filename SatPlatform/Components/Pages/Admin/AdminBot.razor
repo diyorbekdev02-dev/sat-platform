@@ -130,7 +130,7 @@ else
     {
         <div class="card mb">
             <h3>Bot rollari</h3>
-            <p class="small muted">Botdagi rol saytdagi roldan <b>alohida</b>. Masalan, kimdir botda <b>admin</b> bo'ladi, saytda esa oddiy o'qituvchi bo'lib qoladi yoki saytga umuman kirmaydi. Saytdagi rollar avvalgidek <a href="/admin/users">Xodimlar</a> bo'limida beriladi. «Sayt roli bo'yicha» — botda saytdagi rol ishlatiladi. O'quvchi va ota-ona rollari ularning yozuvlaridan olinadi (ro'yxatdan botning o'zida o'tishadi).</p>
+            <p class="small muted">Botdagi rol saytdagi roldan <b>alohida</b>. Masalan, kimdir botda <b>admin</b> bo'ladi, saytda esa oddiy o'qituvchi bo'lib qoladi yoki saytga umuman kirmaydi. Saytdagi rollar avvalgidek <a href="/admin/users">Xodimlar</a> bo'limida beriladi. «Sayt roli bo'yicha» — botda saytdagi rol ishlatiladi. <b>PDF qo'shish</b> — botdagi kutubxonaga PDF qo'shish va o'zgartirish ruxsati; uni faqat super admin beradi (super adminda doim bor). O'quvchi va ota-ona rollari ularning yozuvlaridan olinadi (ro'yxatdan botning o'zida o'tishadi).</p>
             <h4 class="mt">Botga xodim qo'shish</h4>
             <div class="form-row">
                 <div><label class="lbl">Ism-familiya</label><input class="input" @bind="newName" placeholder="Ali Valiyev" /></div>
@@ -144,7 +144,7 @@ else
         <div class="card pad-0">
             <div class="list-head"><span class="count-pill">Umumiy soni: <b>@FilteredRoles.Count()</b></span></div>
             <div class="table-wrap"><table class="table">
-                <thead><tr><th>Foydalanuvchi</th><th>Saytdagi rol</th><th>Botdagi rol</th><th>Saytga kirish</th><th>Botda</th></tr></thead>
+                <thead><tr><th>Foydalanuvchi</th><th>Saytdagi rol</th><th>Botdagi rol</th><th>Saytga kirish</th><th>PDF qo'shish</th><th>Botda</th></tr></thead>
                 <tbody>@foreach (var r in FilteredRoles)
                 {
                     <tr class="@(r.IsActive ? "" : "muted")">
@@ -155,6 +155,7 @@ else
                                 @foreach (var role in MentorBotAdmin.BotStaffRoles) { <option value="@role">@Labels.Role(role)</option> }
                             </select></td>
                         <td><label class="row small"><input type="checkbox" checked="@r.CanUseSite" @onchange="e => SetSiteAsync(r, e.Value is true)" /> @(r.CanUseSite ? "ochiq" : "faqat bot")</label></td>
+                        <td><label class="row small" title="@(isSuper ? "" : "Faqat super admin beradi")"><input type="checkbox" checked="@r.CanManagePdfs" disabled="@(!isSuper || r.SiteRole == UserRole.SuperAdmin)" @onchange="e => SetPdfAsync(r, e.Value is true)" /> @(r.CanManagePdfs ? "ruxsat bor" : "—")</label></td>
                         <td>@(r.InBot ? "✅" : "—")</td>
                     </tr>
                 }</tbody></table></div>
@@ -300,6 +301,7 @@ else
     {
         SetTitle("Bot");
         groups = await Academy.GroupsAsync();
+        isSuper = await IsSuperAsync();
         await LoadAsync();
         Loading = false;
         timer = new Timer(_ => InvokeAsync(TickAsync), null, 10000, 10000);
@@ -401,6 +403,10 @@ else
     // ---- bot roles
 
     private async Task<bool> IsSuperAsync() => await Me.RoleAsync() == UserRole.SuperAdmin;
+    private bool isSuper;
+
+    private async Task SetPdfAsync(BotRoleRow r, bool allowed) =>
+        await RunAsync(async () => await BotAdmin.SetPdfPermissionAsync(r.UserId, allowed, await Me.IdAsync(), await IsSuperAsync()), allowed ? "PDF ruxsati berildi" : "PDF ruxsati olindi");
 
     private async Task SetBotRoleAsync(BotRoleRow r, string? value)
     {
