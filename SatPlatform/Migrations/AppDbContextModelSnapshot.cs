@@ -876,6 +876,10 @@ namespace SatPlatform.Migrations
                     b.Property<long>("MessageId")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("TelegramFileId")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("Text")
                         .IsRequired()
                         .HasMaxLength(2000)
@@ -1926,7 +1930,13 @@ namespace SatPlatform.Migrations
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
 
+                    b.Property<int?>("BotRole")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("CanManageQuestions")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("CanUseSite")
                         .HasColumnType("boolean");
 
                     b.Property<DateTime>("CreatedAt")

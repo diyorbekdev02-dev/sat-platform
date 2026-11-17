@@ -53,6 +53,10 @@ public partial class MentorBotService(
     private static object Inline(params B[][] rows) => Inline(rows.AsEnumerable());
     private static object Column(IEnumerable<B> buttons) => Inline(buttons.Select(b => new[] { b }));
 
+    /// <summary>The user as the bot sees them: the bot role (if set) replaces the site role. Detached copy, never saved.</summary>
+    internal static User BotView(User u) => u.BotRole is not UserRole r || r == u.Role ? u
+        : new User { Id = u.Id, FullName = u.FullName, Phone = u.Phone, Role = r, IsActive = u.IsActive, TelegramChatId = u.TelegramChatId, TelegramUsername = u.TelegramUsername, CanUseSite = u.CanUseSite };
+
     private static bool IsStaff(User? u) => u?.Role is UserRole.Admin or UserRole.SuperAdmin or UserRole.Teacher or UserRole.Assistant;
     private static bool IsAdmin(User? u) => u?.Role is UserRole.Admin or UserRole.SuperAdmin;
 
@@ -217,7 +221,8 @@ public partial class MentorBotService(
         chat.LastSeenAt = DateTime.UtcNow; chat.IsBlocked = false;
         await db.SaveChangesAsync(ct);
 
-        var user = chat.UserId is int uid ? await db.Users.FirstOrDefaultAsync(x => x.Id == uid, ct) : null;
+        var user = chat.UserId is int uid ? await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == uid, ct) : null;
+        if (user is not null) user = BotView(user);
         if (user is not null && !user.IsActive) user = null;
         var c = new Ctx { U = u, Db = db, Chat = chat, User = user, Ct = ct };
 
@@ -429,10 +434,10 @@ public partial class MentorBotService(
             c.Chat.UserId = user.Id;
             user.TelegramChatId ??= c.ChatId;
             user.TelegramUsername ??= c.U.Username;
-            c.User = user;
+            c.User = BotView(user);
             await c.ResetAsync();
             await audit.LogAsync(user.Id, "MentorBotLinked", "User", user.Id, $"chat {c.ChatId}");
-            await Say(c, $"✅ Hisobingiz bog'landi: <b>{H(user.FullName)}</b> ({Labels.Role(user.Role)}).", MenuFor(user));
+            await Say(c, $"✅ Hisobingiz bog'landi: <b>{H(user.FullName)}</b> ({Labels.Role(c.User.Role)}).", MenuFor(c.User));
             await GreetAsync(c);
             return;
         }
@@ -530,7 +535,7 @@ public partial class MentorBotService(
     private async Task<List<int>> AdminUserIdsAsync(CancellationToken ct)
     {
         await using var db = await factory.CreateDbContextAsync(ct);
-        return await db.Users.Where(u => u.IsActive && (u.Role == UserRole.Admin || u.Role == UserRole.SuperAdmin)).Select(u => u.Id).ToListAsync(ct);
+        return await db.Users.Where(u => u.IsActive && ((u.BotRole ?? u.Role) == UserRole.Admin || (u.BotRole ?? u.Role) == UserRole.SuperAdmin)).Select(u => u.Id).ToListAsync(ct);
     }
 
     private async Task NotifyAdminsAsync(string html, object? markup, CancellationToken ct)

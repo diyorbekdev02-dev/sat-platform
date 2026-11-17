@@ -265,6 +265,91 @@ public class MentorBotTests(EngineFixture f)
     }
 
     [Fact]
+    public async Task Bot_role_is_separate_from_site_role_and_bot_only_accounts_cannot_use_the_site()
+    {
+        if (!f.Available) return;
+        Configure();
+        var admin = Get<MentorBotAdmin>();
+        await using var db = await DbAsync();
+        var teacher = await db.Users.FirstAsync(u => u.Phone == "+998901111112");
+        Assert.Null(await admin.SetBotRoleAsync(teacher.Id, UserRole.Admin, f.AdminId, true));
+
+        const long chat = 700501;
+        await LinkAsync(chat, "+998901111112");
+        var all = string.Join("\n", Tg.Sent(chat).Select(c => c.Body?["text"]?.GetValue<string>()));
+        Assert.Contains("Qarzdorlar", all);                 // admin-only item in the bot
+        await using (var db2 = await DbAsync())
+            Assert.Equal(UserRole.Teacher, (await db2.Users.FindAsync(teacher.Id))!.Role); // site role untouched
+
+        // back to the site role
+        Assert.Null(await admin.SetBotRoleAsync(teacher.Id, null, f.AdminId, true));
+        Tg.Clear();
+        await Text(chat, "/start");
+        Assert.DoesNotContain("Qarzdorlar", Tg.LastText(chat));
+
+        // a new bot-only admin
+        Assert.Null(await admin.AddBotStaffAsync("Bot Admin", "+998977005555", UserRole.Admin, f.AdminId, true));
+        var botOnly = await db.Users.FirstAsync(u => u.Phone == "+998977005555");
+        Assert.False(botOnly.CanUseSite);
+        Assert.Equal(UserRole.Admin, botOnly.BotRole);
+        var auth = Get<AuthService>();
+        var token = await auth.IssueLoginTokenAsync(botOnly.Id);
+        Assert.Null((await auth.ConsumeLoginTokenAsync(token)).User);
+        await LinkAsync(700502, "+998977005555");
+        Assert.Contains("Mentor paneli", string.Join("\n", Tg.Sent(700502).Select(c => c.Body?["text"]?.GetValue<string>())));
+
+        // site access can be reopened; an admin cannot lock themself out
+        Assert.Null(await admin.SetSiteAccessAsync(botOnly.Id, true, f.AdminId, true));
+        Assert.NotNull((await auth.ConsumeLoginTokenAsync(await auth.IssueLoginTokenAsync(botOnly.Id))).User);
+        Assert.NotNull(await admin.SetSiteAccessAsync(f.AdminId, false, f.AdminId, true));
+        // students in a group cannot become bot staff
+        var studentUser = await db.Users.FirstAsync(u => u.Phone == "+998902000003");
+        Assert.NotNull(await admin.SetBotRoleAsync(studentUser.Id, UserRole.Admin, f.AdminId, true));
+    }
+
+    [Fact]
+    public async Task Site_admin_panel_answers_questions_confirms_receipts_and_broadcasts_via_the_bot()
+    {
+        if (!f.Available) return;
+        Configure();
+        var admin = Get<MentorBotAdmin>();
+        const long student = 700601;
+        await LinkAsync(student, "+998902000004");
+
+        // question → answered from the site
+        await Text(student, "/savol");
+        await Text(student, "Logarifm qoidalari?");
+        await using var db = await DbAsync();
+        var q = await db.MentorQuestions.OrderByDescending(x => x.Id).FirstAsync();
+        Assert.Contains((await admin.QuestionsAsync(openOnly: true)), x => x.Id == q.Id);
+        Assert.Null(await admin.AnswerAsync(q.Id, "log(ab)=log a+log b", f.AdminId));
+        Assert.Contains("log(ab)", Tg.LastText(student));
+        Assert.NotNull(await admin.AnswerAsync(q.Id, "yana", f.AdminId)); // already answered
+
+        // receipt → payment from the site
+        await Text(student, "/tolov");
+        await Press(student, "rcp");
+        await File(student, "chek");
+        var r = await db.MentorQuestions.OrderByDescending(x => x.Id).FirstAsync();
+        Assert.Equal(MentorQuestionKind.Receipt, r.Kind);
+        Assert.Equal("F1", r.TelegramFileId);
+        var sid = await db.Students.Where(s => s.User.Phone == "+998902000004").Select(s => s.Id).FirstAsync();
+        var before = await db.Payments.CountAsync(p => p.StudentId == sid);
+        Assert.Null(await admin.AcceptReceiptAsync(r.Id, 450000, f.AdminId));
+        Assert.Equal(before + 1, await db.Payments.CountAsync(p => p.StudentId == sid));
+        Assert.Contains("qabul qilindi", Tg.LastText(student));
+        Assert.NotNull(await admin.QuestionFileAsync(r.Id));
+
+        // broadcast from the site
+        var gid = await db.Enrollments.Where(e => e.StudentId == sid && e.Status == EnrollmentStatus.Active).Select(e => e.GroupId).FirstAsync();
+        var (sent, err) = await admin.BroadcastAsync(BroadcastTarget.Group, gid, "Saytdan e lon", null, f.AdminId);
+        Assert.Null(err);
+        Assert.True(sent >= 1);
+        Assert.Contains("Saytdan e lon", Tg.LastText(student));
+        Assert.NotNull((await admin.BroadcastAsync(BroadcastTarget.Group, null, "x", null, f.AdminId)).Error);
+    }
+
+    [Fact]
     public async Task Teacher_cannot_touch_other_groups_and_students_cannot_use_admin_actions()
     {
         if (!f.Available) return;

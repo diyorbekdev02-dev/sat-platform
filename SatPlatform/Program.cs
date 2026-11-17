@@ -38,6 +38,19 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     o.SlidingExpiration = true;
     o.LoginPath = "/login";
     o.AccessDeniedPath = "/forbidden";
+    // a deactivated or Telegram-bot-only account loses its site session (checked at most once a minute per user)
+    o.Events.OnValidatePrincipal = async ctx =>
+    {
+        if (!int.TryParse(ctx.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value, out var id)) return;
+        if (!SiteAccessCache.TryGet(id, out var ok))
+        {
+            var factory = ctx.HttpContext.RequestServices.GetRequiredService<IDbContextFactory<AppDbContext>>();
+            await using var db = await factory.CreateDbContextAsync();
+            ok = await db.Users.AnyAsync(u => u.Id == id && u.IsActive && u.CanUseSite);
+            SiteAccessCache.Set(id, ok);
+        }
+        if (!ok) { ctx.RejectPrincipal(); await ctx.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme); }
+    };
 });
 builder.Services.AddAuthorization();
 
@@ -175,6 +188,18 @@ app.MapPost("/api/upload-image", async (HttpContext http, MediaService media) =>
     var (url, _, error) = await media.UploadAsync(stream, file.FileName, file.ContentType, file.Length, userId, imagesOnly: true);
     return error is null ? Results.Json(new { url }) : Results.BadRequest(error);
 }).DisableAntiforgery();
+
+// ---- photo / PDF of a mentor-bot question or payment receipt (admins only; fetched from Telegram)
+app.MapGet("/admin/bot/file/{id:int}", async (int id, HttpContext http, SatPlatform.Services.MentorBot.MentorBotAdmin bot) =>
+{
+    var role = http.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+    if (http.User.Identity?.IsAuthenticated != true) return Results.Unauthorized();
+    if (role is not ("Admin" or "SuperAdmin")) return Results.Forbid();
+    var file = await bot.QuestionFileAsync(id);
+    if (file is null) return Results.NotFound();
+    http.Response.Headers.CacheControl = "private,no-store";
+    return Results.File(file.Value.Data, file.Value.ContentType);
+});
 
 app.MapGet("/healthz", () => Results.Text("ok"));
 

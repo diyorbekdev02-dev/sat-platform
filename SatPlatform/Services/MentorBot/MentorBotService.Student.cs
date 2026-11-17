@@ -247,7 +247,7 @@ public partial class MentorBotService
         var text = c.U.Text?.Trim() ?? "";
         var label = c.U.MediaKind switch { "photo" => "[rasm] ", "document" => "[fayl] ", "voice" => "[ovozli xabar] ", "video" => "[video] ", _ => "" } + text;
         if (label.Trim().Length == 0) return false;
-        var q = new MentorQuestion { Kind = receipt ? MentorQuestionKind.Receipt : MentorQuestionKind.Question, ChatId = c.ChatId, UserId = c.User!.Id, MessageId = c.U.MessageId, Text = Cut(label, 2000) };
+        var q = new MentorQuestion { Kind = receipt ? MentorQuestionKind.Receipt : MentorQuestionKind.Question, ChatId = c.ChatId, UserId = c.User!.Id, MessageId = c.U.MessageId, TelegramFileId = c.U.FileId, Text = Cut(label, 2000) };
         c.Db.MentorQuestions.Add(q);
         await c.ResetAsync();
         await Say(c, receipt ? "🧾 Chek yuborildi. Tasdiqlangach xabar beraman." : "✅ Savolingiz mentorga yuborildi. Javob kelganda shu yerga keladi.", MenuFor(c.User));

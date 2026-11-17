@@ -95,7 +95,7 @@ public class MentorBotJobs(MentorBotSender sender, IDbContextFactory<AppDbContex
         if (rows.Count == 0) return;
         var sb = new StringBuilder($"⚠️ <b>Kunlik xavf signali</b> ({rows.Count})\n");
         foreach (var r in rows.Take(40)) sb.Append($"\n• <b>{H(r.Name)}</b> — {H(r.Reason)}");
-        var admins = await db.Users.Where(u => u.IsActive && (u.Role == UserRole.Admin || u.Role == UserRole.SuperAdmin)).Select(u => u.Id).ToListAsync(ct);
+        var admins = await db.Users.Where(u => u.IsActive && ((u.BotRole ?? u.Role) == UserRole.Admin || (u.BotRole ?? u.Role) == UserRole.SuperAdmin)).Select(u => u.Id).ToListAsync(ct);
         foreach (var a in admins) await sender.SendToUserAsync(a, sb.ToString(), null, ct);
         // teachers get only their own students
         var teachers = await db.Groups.Where(g => g.IsActive).SelectMany(g => new[] { g.TeacherUserId, g.AssistantUserId }).Where(x => x != null).Distinct().ToListAsync(ct);
@@ -103,7 +103,7 @@ public class MentorBotJobs(MentorBotSender sender, IDbContextFactory<AppDbContex
         {
             var user = await db.Users.FindAsync([t], ct);
             if (user is null || !user.IsActive || admins.Contains(t)) continue;
-            var scope = (await academy.StudentScopeAsync(t, user.Role)).ToHashSet();
+            var scope = (await academy.StudentScopeAsync(t, user.BotRole ?? user.Role)).ToHashSet();
             var mine = rows.Where(r => scope.Contains(r.StudentId)).ToList();
             if (mine.Count == 0) continue;
             await sender.SendToUserAsync(t, "⚠️ <b>Xavf signali</b>\n" + string.Join("\n", mine.Select(r => $"• <b>{H(r.Name)}</b> — {H(r.Reason)}")), null, ct);

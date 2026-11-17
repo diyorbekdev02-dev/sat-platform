@@ -16,6 +16,10 @@ public class User
     [MaxLength(64)] public string? TelegramUsername { get; set; }
     /// <summary>Teachers only: may create/edit questions in the Question Bank.</summary>
     public bool CanManageQuestions { get; set; }
+    /// <summary>Role inside the JavohirsMath mentor bot; null = same as the site role.</summary>
+    public UserRole? BotRole { get; set; }
+    /// <summary>false = Telegram-bot-only account (cannot sign in to the site).</summary>
+    public bool CanUseSite { get; set; } = true;
     public bool NotifyTestResults { get; set; } = true;
     public bool NotifyAttendance { get; set; } = true;
     public bool NotifyHomework { get; set; } = true;
@@ -677,6 +681,8 @@ public class MentorQuestion
     public User? User { get; set; }
     /// <summary>Message id in the student's chat (copied to staff, so photos/voice keep working).</summary>
     public long MessageId { get; set; }
+    /// <summary>Telegram file id of the photo / document (to show it on the admin page).</summary>
+    [MaxLength(200)] public string? TelegramFileId { get; set; }
     [MaxLength(2000)] public string Text { get; set; } = "";
     [MaxLength(2000)] public string? Answer { get; set; }
     public int? AnsweredByUserId { get; set; }

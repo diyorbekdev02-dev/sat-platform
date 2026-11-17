@@ -46,6 +46,7 @@ public class EngineFixture : IAsyncLifetime
         sc.AddSingleton<SatPlatform.Services.MentorBot.MentorBotStatus>();
         sc.AddSingleton<SatPlatform.Services.MentorBot.MentorBotService>();
         sc.AddSingleton<SatPlatform.Services.MentorBot.MentorBotJobs>();
+        sc.AddSingleton<SatPlatform.Services.MentorBot.MentorBotAdmin>();
         Services = sc.BuildServiceProvider();
         try
         {

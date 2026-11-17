@@ -71,6 +71,7 @@ public class AuthService(
         if (user is null) return new(null, "Bu raqam ro'yxatdan o'tmagan.");
         if (user.PasswordHash is null) return new(null, "Bu hisob uchun parol o'rnatilmagan. Telegram kodi orqali kiring va profilda parol o'rnating.");
         if (!user.IsActive) return new(null, "Hisobingiz faol emas. Administratorga murojaat qiling.");
+        if (!user.CanUseSite) return new(null, "Bu hisob faqat Telegram bot uchun. Saytga kirish yopilgan.");
 
         var result = Hasher.VerifyHashedPassword(user, user.PasswordHash, password);
         if (result == PasswordVerificationResult.Failed)
@@ -275,6 +276,7 @@ public class AuthService(
         var user = await db.Users.Include(u => u.Student).FirstOrDefaultAsync(u => u.Phone == phone);
         if (user is null) return new(null, "Bu raqam ro'yxatdan o'tmagan.");
         if (!user.IsActive) return new(null, "Hisobingiz faol emas. Administratorga murojaat qiling.");
+        if (!user.CanUseSite) return new(null, "Bu hisob faqat Telegram bot uchun. Saytga kirish yopilgan.");
         user.LastSeenAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         return new(user, null);
@@ -307,7 +309,7 @@ public class AuthService(
         var t = await db.LoginTokens.FindAsync(token);
         if (t is null || t.Used || t.ExpiresAt < DateTime.UtcNow) return (null, null);
         t.Used = true;
-        var user = await db.Users.Include(u => u.Student).FirstOrDefaultAsync(u => u.Id == t.UserId && u.IsActive);
+        var user = await db.Users.Include(u => u.Student).FirstOrDefaultAsync(u => u.Id == t.UserId && u.IsActive && u.CanUseSite);
         if (user is not null) user.LastSeenAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         return (user, t.ReturnUrl);

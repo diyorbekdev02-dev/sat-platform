@@ -223,3 +223,18 @@ public class AuditService(IDbContextFactory<AppDbContext> factory, ILogger<Audit
 }
 
 public class AppException(string message) : Exception(message);
+
+/// <summary>Short-lived cache of "may this user use the site" (IsActive && CanUseSite) for cookie validation.</summary>
+public static class SiteAccessCache
+{
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, (bool Ok, DateTime At)> Items = new();
+    public static bool TryGet(int userId, out bool ok)
+    {
+        ok = false;
+        if (!Items.TryGetValue(userId, out var e) || DateTime.UtcNow - e.At > TimeSpan.FromMinutes(1)) return false;
+        ok = e.Ok;
+        return true;
+    }
+    public static void Set(int userId, bool ok) => Items[userId] = (ok, DateTime.UtcNow);
+    public static void Invalidate(int userId) => Items.TryRemove(userId, out _);
+}
