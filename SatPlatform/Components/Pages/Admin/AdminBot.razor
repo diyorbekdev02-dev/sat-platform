@@ -1,0 +1,240 @@
+@page "/admin/bot"
+@attribute [Authorize(Roles = "Admin,SuperAdmin")]
+@inherits AppPage
+@implements IDisposable
+@using SatPlatform.Services.MentorBot
+@inject MentorBotAdmin BotAdmin
+@inject MentorBotStatus Status
+
+<PageTitle>Bot</PageTitle>
+
+@if (Loading) { <div class="loading"><span class="spinner"></span></div> }
+else
+{
+    <div class="card mb">
+        <div class="row between wrap">
+            <div class="row grow">
+                <div class="bot-avatar"><Icon Name="telegram" Size="26" /></div>
+                <div>
+                    <h2 class="m-0">JavohirsMath — mentor boti</h2>
+                    <div class="small muted">
+                        @if (!hasToken) { <span class="badge warn">Sozlanmagan</span> }
+                        else if (Status.Running) { <span class="badge ok">● Ishlayapti</span> }
+                        else { <span class="badge danger">To'xtagan</span> }
+                        @if (Status.Username is not null) { <span> · @@@Status.Username</span> }
+                        @if (Status.StartedAt is not null) { <span> · ishga tushgan @Tz.Fmt(Status.StartedAt)</span> }
+                        @if (Status.LastUpdateAt is not null) { <span> · oxirgi xabar @Tz.Fmt(Status.LastUpdateAt, "HH:mm:ss")</span> }
+                    </div>
+                    @if (Status.LastError is not null && hasToken) { <div class="error small">@Status.LastError</div> }
+                </div>
+            </div>
+            <div class="row">
+                @if (Status.Username is not null) { <a class="btn primary" href="https://t.me/@Status.Username" target="_blank" rel="noopener"><Icon Name="telegram" /> Botni ochish</a> }
+                <button class="btn" @onclick="RefreshAsync"><Icon Name="refresh" /> Yangilash</button>
+            </div>
+        </div>
+        <p class="small muted mt-s mb-0">Barcha amallar (davomat, vazifa, baholash, e'lonlar, savollarga javob, to'lovlar) <b>Telegram botning o'zida</b> bajariladi — o'quvchi, ota-ona va mentorlar saytga kirishi shart emas. Bu sahifada bot holatini, foydalanuvchilarni va yozishmalarni kuzatasiz.</p>
+    </div>
+
+    <div class="grid c4 mb">
+        <div class="stat accent"><div class="label">Bot foydalanuvchilari</div><div class="value">@stats.Chats</div><div class="sub">@stats.Unlinked ta hali ro'yxatdan o'tmagan</div></div>
+        <div class="stat"><div class="label">O'quvchi / ota-ona / xodim</div><div class="value">@stats.Students / @stats.Parents / @stats.Staff</div></div>
+        <div class="stat"><div class="label">Xabarlar (24 soat)</div><div class="value">@stats.Messages24h</div><div class="sub">bugun @stats.QuizToday ta mini test</div></div>
+        <div class="stat"><div class="label">Javobsiz savollar</div><div class="value @(stats.OpenQuestions > 0 ? "level-weak" : "")">@stats.OpenQuestions</div><div class="sub">@stats.Scheduled ta rejalashtirilgan e'lon</div></div>
+    </div>
+
+    <div class="tabs">
+        @foreach (var t in new[] { ("users", "Foydalanuvchilar"), ("chat", "Yozishmalar"), ("questions", "Savollar va cheklar"), ("broadcasts", "E'lonlar"), ("setup", "Sozlash va qo'llanma") })
+        { <button class="tab @(tab == t.Item1 ? "active" : "")" @onclick="() => SetTabAsync(t.Item1)">@t.Item2</button> }
+    </div>
+
+    @if (tab == "users")
+    {
+        <div class="filters"><input class="input sm" placeholder="Qidiruv (ism, telefon, @@username)" @bind="search" @bind:event="oninput" />
+            <select class="input sm" @bind="roleFilter"><option value="">Barcha rollar</option><option value="Student">O'quvchilar</option><option value="Parent">Ota-onalar</option><option value="staff">Xodimlar</option><option value="none">Ro'yxatdan o'tmagan</option></select></div>
+        <div class="card pad-0">
+            <div class="list-head"><span class="count-pill">Umumiy soni: <b>@FilteredChats.Count()</b></span></div>
+            <div class="table-wrap"><table class="table">
+                <thead><tr><th>Foydalanuvchi</th><th>Rol</th><th>Telefon</th><th>Telegram</th><th>Qo'shilgan</th><th>Oxirgi faollik</th><th class="num">Xabarlar</th><th></th></tr></thead>
+                <tbody>@foreach (var c in FilteredChats)
+                {
+                    <tr><td class="bold">@c.Name</td>
+                        <td>@if (c.Role is UserRole r) { <span class="badge">@Labels.Role(r)</span> } else { <span class="badge warn">ro'yxatdan o'tmagan</span> }</td>
+                        <td>@if (c.Phone is not null) { <PhoneLink Value="@c.Phone" /> }</td>
+                        <td>@(c.Username is null ? "—" : "@" + c.Username)</td>
+                        <td>@Tz.FmtDate(c.CreatedAt)</td><td>@Tz.Fmt(c.LastSeenAt)</td><td class="num">@c.Messages</td>
+                        <td><button class="btn sm" @onclick="() => OpenChatAsync(c.ChatId)"><Icon Name="message" Size="14" /> Yozishma</button></td></tr>
+                }</tbody></table></div>
+            @if (!FilteredChats.Any()) { <div class="empty"><h3>Hali hech kim yo'q</h3><p class="muted">Botni o'quvchilarga ulashing: @(Status.Username is null ? "token kiriting" : "t.me/" + Status.Username)</p></div> }
+        </div>
+    }
+    else if (tab == "chat")
+    {
+        <div class="filters">
+            <select class="input sm" @bind="ChatFilter"><option value="">Barcha yozishmalar</option>@foreach (var c in chats) { <option value="@c.ChatId">@c.Name @(c.Role is UserRole r ? "(" + Labels.Role(r) + ")" : "")</option> }</select>
+            <input class="input sm" placeholder="Matn bo'yicha qidiruv" @bind="msgSearch" @bind:after="LoadMessagesAsync" />
+            <label class="small row"><input type="checkbox" @bind="autoRefresh" /> har 10 soniyada yangilash</label>
+        </div>
+        <div class="card bot-chat">
+            @if (messages.Count == 0) { <div class="empty"><h3>Xabarlar yo'q</h3></div> }
+            @foreach (var m in messages)
+            {
+                <div class="bot-msg @(m.Incoming ? "in" : "out")">
+                    <div class="bot-meta">@(m.Incoming ? m.ChatName : "🤖 Bot → " + m.ChatName) · @Tz.Fmt(m.CreatedAt, "dd.MM HH:mm:ss")</div>
+                    <div class="bot-text">@m.Text</div>
+                </div>
+            }
+        </div>
+    }
+    else if (tab == "questions")
+    {
+        <div class="card pad-0"><div class="table-wrap"><table class="table">
+            <thead><tr><th>Turi</th><th>Kimdan</th><th>Matn</th><th>Holat / javob</th><th>Sana</th></tr></thead>
+            <tbody>@foreach (var q in questions)
+            {
+                <tr><td>@(q.Kind == MentorQuestionKind.Receipt ? "🧾 Chek" : "❓ Savol")</td><td class="bold">@q.Name</td><td>@q.Text</td>
+                    <td>@if (q.AnsweredAt is null) { <span class="badge warn">Javob kutilmoqda</span> } else { <span class="badge ok">@q.AnsweredBy</span> <div class="small muted">@q.Answer</div> }</td>
+                    <td>@Tz.Fmt(q.CreatedAt)</td></tr>
+            }</tbody></table></div>
+            @if (questions.Count == 0) { <div class="empty"><h3>Savollar yo'q</h3></div> }
+            <div class="small muted pad">Savollarga mentorlar botdagi «❓ Savollar» bo'limidan javob beradi.</div>
+        </div>
+    }
+    else if (tab == "broadcasts")
+    {
+        <div class="card pad-0"><div class="table-wrap"><table class="table">
+            <thead><tr><th>Kimga</th><th>Matn</th><th>Muallif</th><th>Holat</th><th class="num">Yetkazildi</th></tr></thead>
+            <tbody>@foreach (var b in broadcasts)
+            {
+                <tr><td>@Target(b)</td><td style="white-space:pre-wrap">@b.Text</td><td>@b.Author</td>
+                    <td>@if (b.SentAt is not null) { <span class="badge ok">Yuborildi @Tz.Fmt(b.SentAt)</span> } else { <span class="badge accent">Rejada: @Tz.Fmt(b.ScheduledAt)</span> }</td>
+                    <td class="num">@b.SentCount</td></tr>
+            }</tbody></table></div>
+            @if (broadcasts.Count == 0) { <div class="empty"><h3>E'lonlar yo'q</h3></div> }
+        </div>
+    }
+    else
+    {
+        <div class="grid c2">
+            <div class="card">
+                <h3>Bot tokeni</h3>
+                <ol class="small">
+                    <li>Telegramda <b>@@BotFather</b> ni oching → <code>/newbot</code>.</li>
+                    <li>Nom: <i>JavohirsMath</i>, username: masalan <i>JavohirsMathBot</i>.</li>
+                    <li>BotFather bergan tokenni shu yerga kiriting va saqlang — bot 10 soniya ichida ishga tushadi.</li>
+                    <li>Telegramda botga <code>/start</code> yozing va telefon raqamingizni yuboring — admin sifatida bog'lanasiz.</li>
+                </ol>
+                <label class="lbl">Token @(hasToken ? "(saqlangan — almashtirish uchun yangisini kiriting)" : "")</label>
+                <input class="input" type="password" autocomplete="off" placeholder="123456789:AA..." @bind="token" />
+                @if (Error is not null) { <div class="error">@Error</div> }
+                <div class="row mt-s">
+                    <button class="btn primary" @onclick="SaveTokenAsync" disabled="@busy">Saqlash</button>
+                    @if (hasToken) { <button class="btn danger" @onclick="ClearTokenAsync" disabled="@busy">Botni o'chirish</button> }
+                </div>
+            </div>
+            <div class="card">
+                <h3>Kim nima qiladi</h3>
+                <p class="small"><b>O'quvchi:</b> ro'yxatdan o'tish (ism, telefon, sinf, kurs), dars jadvali va eslatmalar (1 soat / 10 daqiqa oldin), uy vazifasi va javob yuborish (rasm/PDF/matn), mini test (darhol tekshiriladi), natijalar va zaif mavzular, materiallar va qidiruv, mentorga savol (matn/rasm/ovoz), to'lov holati va chek yuborish.</p>
+                <p class="small"><b>Ota-ona:</b> farzandning davomati, vazifalari, ballari, balansi; dars qoldirsa darhol xabar; har yakshanba haftalik hisobot; to'lov eslatmasi.</p>
+                <p class="small"><b>Admin / o'qituvchi (botda):</b> guruhlar (yaratish, o'quvchi qo'shish/ko'chirish/chiqarish), bir bosishda davomat, vazifa berish (matn/fayl, muddat, maksimal ball), topshirilganlarni baholash va izoh, e'lonlar (guruh / o'quvchilar / ota-onalar / hammaga, rejalashtirish), savollar inbox, qarzdorlar va eslatma, chekni tasdiqlab to'lov kiritish, xavf signallari, hisobot (CSV). O'qituvchilar faqat o'z guruhlarini ko'radi.</p>
+                <p class="small"><b>Avtomatik:</b> dars va vazifa muddati eslatmalari, rejalashtirilgan e'lonlar, har kuni 19:00 da xavf signali, yakshanba 18:00 da ota-onalarga hisobot.</p>
+                <p class="small muted">Buyruqlar: /start /jadval /vazifa /test /natija /materiallar /savol /tolov /admin /cancel</p>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private string tab = "users", search = "", roleFilter = "", msgSearch = "";
+    private string? token;
+    private long? chatFilter;
+    private bool hasToken, busy, autoRefresh = true;
+    private BotStats stats = new(0, 0, 0, 0, 0, 0, 0, 0, 0);
+    private List<BotChatRow> chats = [];
+    private List<BotMessageRow> messages = [];
+    private List<BotQuestionRow> questions = [];
+    private List<BotBroadcastRow> broadcasts = [];
+    private Timer? timer;
+
+    private string ChatFilter
+    {
+        get => chatFilter?.ToString() ?? "";
+        set { chatFilter = long.TryParse(value, out var v) ? v : null; _ = InvokeAsync(LoadMessagesAsync); }
+    }
+
+    private IEnumerable<BotChatRow> FilteredChats => chats.Where(c =>
+        (string.IsNullOrWhiteSpace(search) || c.Name.Contains(search, StringComparison.OrdinalIgnoreCase) || (c.Username ?? "").Contains(search.TrimStart('@'), StringComparison.OrdinalIgnoreCase) || (c.Phone is not null && PhoneFormat.Matches(c.Phone, search))) &&
+        (roleFilter switch
+        {
+            "" => true,
+            "none" => c.Role is null,
+            "staff" => c.Role is UserRole.Admin or UserRole.SuperAdmin or UserRole.Teacher or UserRole.Assistant,
+            _ => c.Role?.ToString() == roleFilter
+        }));
+
+    protected override async Task OnInitializedAsync()
+    {
+        SetTitle("Bot");
+        await LoadAsync();
+        Loading = false;
+        timer = new Timer(_ => InvokeAsync(TickAsync), null, 10000, 10000);
+    }
+
+    private async Task LoadAsync()
+    {
+        hasToken = await BotAdmin.HasTokenAsync();
+        stats = await BotAdmin.StatsAsync();
+        chats = await BotAdmin.ChatsAsync();
+        if (tab == "chat") await LoadMessagesAsync();
+        if (tab == "questions") questions = await BotAdmin.QuestionsAsync();
+        if (tab == "broadcasts") broadcasts = await BotAdmin.BroadcastsAsync();
+    }
+
+    private async Task TickAsync()
+    {
+        if (!autoRefresh) return;
+        try { stats = await BotAdmin.StatsAsync(); if (tab == "chat") await LoadMessagesAsync(); StateHasChanged(); } catch { }
+    }
+
+    private async Task RefreshAsync() { await LoadAsync(); Toasts.Ok("Yangilandi"); }
+
+    private async Task SetTabAsync(string t) { tab = t; await LoadAsync(); }
+
+    private async Task OpenChatAsync(long chatId) { chatFilter = chatId; tab = "chat"; await LoadMessagesAsync(); }
+
+    private async Task LoadMessagesAsync() { messages = await BotAdmin.MessagesAsync(chatFilter, msgSearch); StateHasChanged(); }
+
+    private async Task SaveTokenAsync()
+    {
+        Error = null; busy = true;
+        try
+        {
+            if (string.IsNullOrWhiteSpace(token)) { Error = "Tokenni kiriting."; return; }
+            var (username, error) = await BotAdmin.SetTokenAsync(token, await Me.IdAsync());
+            if (error is not null) { Error = error; return; }
+            token = null; hasToken = true;
+            Toasts.Ok($"Saqlandi: @{username}. Bot bir necha soniyada ishga tushadi.");
+        }
+        finally { busy = false; }
+    }
+
+    private async Task ClearTokenAsync()
+    {
+        if (!await ConfirmAsync("Botni o'chirasizmi? Foydalanuvchilar bot javob bermay qoladi.")) return;
+        busy = true;
+        await BotAdmin.SetTokenAsync(null, await Me.IdAsync());
+        hasToken = false; busy = false;
+        Toasts.Ok("Bot o'chirildi");
+    }
+
+    private static string Target(BotBroadcastRow b) => b.Target switch
+    {
+        BroadcastTarget.AllStudents => "Barcha o'quvchilar",
+        BroadcastTarget.Parents => b.Group is null ? "Barcha ota-onalar" : $"{b.Group} — ota-onalar",
+        BroadcastTarget.Group => $"{b.Group} guruhi",
+        BroadcastTarget.Student => "Bitta o'quvchi",
+        _ => "Hammaga"
+    };
+
+    public void Dispose() => timer?.Dispose();
+}

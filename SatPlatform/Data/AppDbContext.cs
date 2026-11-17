@@ -50,6 +50,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<TelegramLink> TelegramLinks => Set<TelegramLink>();
     public DbSet<LoginToken> LoginTokens => Set<LoginToken>();
     public DbSet<BotState> BotStates => Set<BotState>();
+    public DbSet<MentorBotChat> MentorBotChats => Set<MentorBotChat>();
+    public DbSet<MentorBotMessage> MentorBotMessages => Set<MentorBotMessage>();
+    public DbSet<MentorQuestion> MentorQuestions => Set<MentorQuestion>();
+    public DbSet<MentorBroadcast> MentorBroadcasts => Set<MentorBroadcast>();
+    public DbSet<MentorReminderLog> MentorReminderLogs => Set<MentorReminderLog>();
+    public DbSet<MentorQuizResult> MentorQuizResults => Set<MentorQuizResult>();
 
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
@@ -57,6 +63,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     {
         b.Entity<User>().HasIndex(u => u.Phone).IsUnique();
         b.Entity<User>().HasIndex(u => u.TelegramChatId);
+        b.Entity<MentorBotChat>().HasIndex(c => c.UserId);
+        b.Entity<MentorBotMessage>().HasIndex(m => new { m.ChatId, m.CreatedAt });
+        b.Entity<MentorBotMessage>().HasIndex(m => m.CreatedAt);
+        b.Entity<MentorQuestion>().HasIndex(q => q.AnsweredAt);
+        b.Entity<MentorQuizResult>().HasIndex(q => q.StudentId);
+        b.Entity<MentorBroadcast>().Property(x => x.Text).HasMaxLength(3500);
         b.Entity<User>().HasOne(u => u.Student).WithOne(s => s.User).HasForeignKey<Student>(s => s.UserId);
 
         b.Entity<Student>().HasIndex(s => s.UserId).IsUnique();

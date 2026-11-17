@@ -21,6 +21,7 @@ public class EngineFixture : IAsyncLifetime
     public bool Available { get; private set; }
     public int StudentId { get; private set; }
     public int AdminId { get; private set; }
+    public FakeTelegramHandler FakeTelegram { get; } = new();
 
     public async Task InitializeAsync()
     {
@@ -37,6 +38,14 @@ public class EngineFixture : IAsyncLifetime
         sc.AddSingleton<SeedService>(); sc.AddSingleton<AuthService>();
         sc.Configure<TelegramOptions>(_ => { });
         sc.AddHttpClient<TelegramBotClient>();
+        // mentor bot: Telegram is replaced by a recording fake
+        sc.AddSingleton<SatPlatform.Services.CrmService>(); sc.AddSingleton<MaterialService>(); sc.AddSingleton<MediaService>();
+        sc.AddSingleton(FakeTelegram);
+        sc.AddSingleton(sp => new SatPlatform.Services.MentorBot.MentorBotClient(new HttpClient(FakeTelegram), NullLogger<SatPlatform.Services.MentorBot.MentorBotClient>.Instance));
+        sc.AddSingleton<SatPlatform.Services.MentorBot.MentorBotSender>();
+        sc.AddSingleton<SatPlatform.Services.MentorBot.MentorBotStatus>();
+        sc.AddSingleton<SatPlatform.Services.MentorBot.MentorBotService>();
+        sc.AddSingleton<SatPlatform.Services.MentorBot.MentorBotJobs>();
         Services = sc.BuildServiceProvider();
         try
         {

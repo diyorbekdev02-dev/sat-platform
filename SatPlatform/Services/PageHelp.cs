@@ -286,6 +286,11 @@ public static class PageHelp
             S("Filtrlar", "<b>Qarzdorlar</b>, <b>Joriy oyda to'lov muddati</b>, <b>Muddati o'tgan</b> va guruh bo'yicha."),
             S("To'lov qo'shish", "<b>To'lov</b> tugmasi: turi (Naqd, Karta, O'tkazma yoki <b>Hisoblash</b> — oylik qarz yozish), summa, sana va keyingi to'lov sanasi. Pastda to'lovlar tarixi.")),
 
+        ["/admin/bot"] = T("JavohirsMath bot", "O'qituvchi/mentor Telegram boti: hamma amal botning o'zida bajariladi.",
+            S("Ishga tushirish", "<b>Sozlash va qo'llanma</b> bo'limida BotFather bergan tokenni saqlang. Keyin Telegramda botga <code>/start</code> yozib telefon raqamingizni yuboring — siz admin sifatida bog'lanasiz va mentor panelini ko'rasiz."),
+            S("Kuzatish", "<b>Foydalanuvchilar</b> — botdagi o'quvchi, ota-ona va xodimlar. <b>Yozishmalar</b> — bot bilan barcha xabarlar (10 soniyada yangilanadi). <b>Savollar va cheklar</b>, <b>E'lonlar</b> — tarix."),
+            S("Amallar", "Davomat, vazifa, baholash, e'lon, savollarga javob, to'lov kiritish — botdagi mentor menyusidan bajariladi; saytga kirish shart emas.")),
+
         ["/tasks"] = T("Topshiriqlar", "Xodimlar uchun ichki vazifalar.",
             S("Ishlash", "<b>Topshiriq qo'shish</b> — sarlavha, tavsif, mas'ul va muddat. Katakchani belgilab bajarilgan deb qo'ying. Muddati o'tgan bajarilmagan topshiriqning sanasi qizil."),
             S("Ko'rinish", "O'qituvchi faqat o'zining topshiriqlarini ko'radi; administrator hammasini ko'radi va xodim bo'yicha filtrlay oladi.")),

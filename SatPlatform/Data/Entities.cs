@@ -634,3 +634,86 @@ public class StaffTask
     public int? CreatedByUserId { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+// ---------------------------------------------------------------- JavohirsMath mentor bot
+
+/// <summary>A private chat with the mentor Telegram bot (one per Telegram user) and its conversation state.</summary>
+public class MentorBotChat
+{
+    [Key] public long ChatId { get; set; }
+    public int? UserId { get; set; }
+    public User? User { get; set; }
+    [MaxLength(120)] public string? FirstName { get; set; }
+    [MaxLength(64)] public string? Username { get; set; }
+    [MaxLength(20)] public string? Phone { get; set; }
+    [MaxLength(40)] public string Step { get; set; } = "";
+    /// <summary>JSON dictionary with the data of the current wizard step.</summary>
+    [MaxLength(4000)] public string? Data { get; set; }
+    public bool IsBlocked { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime LastSeenAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Message log of the mentor bot (shown on the admin "Bot" page).</summary>
+public class MentorBotMessage
+{
+    public long Id { get; set; }
+    public long ChatId { get; set; }
+    /// <summary>true = from the user to the bot.</summary>
+    public bool Incoming { get; set; }
+    [MaxLength(2000)] public string Text { get; set; } = "";
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public enum MentorQuestionKind { Question = 0, Receipt = 1 }
+
+/// <summary>A student's question to the mentor (or a payment receipt) waiting in the staff inbox.</summary>
+public class MentorQuestion
+{
+    public int Id { get; set; }
+    public MentorQuestionKind Kind { get; set; }
+    public long ChatId { get; set; }
+    public int? UserId { get; set; }
+    public User? User { get; set; }
+    /// <summary>Message id in the student's chat (copied to staff, so photos/voice keep working).</summary>
+    public long MessageId { get; set; }
+    [MaxLength(2000)] public string Text { get; set; } = "";
+    [MaxLength(2000)] public string? Answer { get; set; }
+    public int? AnsweredByUserId { get; set; }
+    public DateTime? AnsweredAt { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public enum BroadcastTarget { AllStudents = 0, Parents = 1, Group = 2, Everyone = 3, Student = 4 }
+
+public class MentorBroadcast
+{
+    public int Id { get; set; }
+    public BroadcastTarget Target { get; set; }
+    public int? GroupId { get; set; }
+    public int? StudentId { get; set; }
+    [MaxLength(3500)] public string Text { get; set; } = "";
+    public DateTime? ScheduledAt { get; set; }
+    public DateTime? SentAt { get; set; }
+    public int SentCount { get; set; }
+    public int CreatedByUserId { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Keys of automatic messages already sent (lesson / deadline reminders, weekly reports) so they go out once.</summary>
+public class MentorReminderLog
+{
+    [Key, MaxLength(80)] public string Key { get; set; } = "";
+    public DateTime SentAt { get; set; } = DateTime.UtcNow;
+}
+
+/// <summary>Result of a mini test taken inside the bot.</summary>
+public class MentorQuizResult
+{
+    public int Id { get; set; }
+    public int StudentId { get; set; }
+    public int Correct { get; set; }
+    public int Total { get; set; }
+    [MaxLength(300)] public string? Topics { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

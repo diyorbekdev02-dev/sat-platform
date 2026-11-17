@@ -1,0 +1,12 @@
+.bot-avatar {
+    width: 48px; height: 48px; border-radius: 14px; flex: 0 0 auto;
+    display: grid; place-items: center;
+    background: var(--accent-soft); color: var(--accent);
+}
+.m-0 { margin: 0; }
+.mb-0 { margin-bottom: 0; }
+.bot-chat { display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow-y: auto; }
+.bot-msg { max-width: min(640px, 88%); padding: 8px 12px; border-radius: 14px; background: var(--bg-2); align-self: flex-start; }
+.bot-msg.out { align-self: flex-end; background: var(--accent-soft); }
+.bot-meta { font-size: 11.5px; color: var(--muted); margin-bottom: 2px; }
+.bot-text { white-space: pre-wrap; word-break: break-word; font-size: 14px; }

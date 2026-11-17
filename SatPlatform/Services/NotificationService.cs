@@ -6,7 +6,7 @@ using SatPlatform.Services.Telegram;
 namespace SatPlatform.Services;
 
 /// <summary>In-app notifications; mirrored to Telegram when the user has linked the bot and opted in.</summary>
-public class NotificationService(IDbContextFactory<AppDbContext> factory, TelegramBotClient bot, IConfiguration config, ILogger<NotificationService> logger)
+public class NotificationService(IDbContextFactory<AppDbContext> factory, TelegramBotClient bot, SatPlatform.Services.MentorBot.MentorBotSender mentorBot, IConfiguration config, ILogger<NotificationService> logger)
 {
     private string PublicUrl => (config["App:PublicUrl"] ?? "").TrimEnd('/');
     private static string H(string? s) => WebUtility.HtmlEncode(s ?? "");
@@ -37,6 +37,9 @@ public class NotificationService(IDbContextFactory<AppDbContext> factory, Telegr
                 n.SentToTelegram = await bot.SendMessageAsync(chat, html);
                 await db.SaveChangesAsync();
             }
+            // the JavohirsMath mentor bot gets the same message (without the site link: its users work only in Telegram)
+            if (enabled && type != NotificationType.PracticeReminder && mentorBot.IsConfigured)
+                await mentorBot.SendToUserAsync(userId, telegramHtml ?? $"<b>{H(title)}</b>\n{H(body)}");
         }
         catch (Exception ex) { logger.LogWarning(ex, "Notification failed for user {UserId}", userId); }
     }

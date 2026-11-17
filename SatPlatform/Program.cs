@@ -66,6 +66,16 @@ builder.Services.AddScoped<SatPlatform.Components.Layout.PageTitleState>();
 builder.Services.Configure<TelegramOptions>(builder.Configuration.GetSection("Telegram"));
 builder.Services.AddHttpClient<TelegramBotClient>(c => c.Timeout = TimeSpan.FromSeconds(60));
 builder.Services.AddHostedService<TelegramBotService>();
+
+// JavohirsMath mentor bot (separate token, set on the admin "Bot" page)
+builder.Services.AddHttpClient("mentorbot", c => c.Timeout = TimeSpan.FromSeconds(60));
+builder.Services.AddSingleton(sp => new SatPlatform.Services.MentorBot.MentorBotClient(
+    sp.GetRequiredService<IHttpClientFactory>().CreateClient("mentorbot"), sp.GetRequiredService<ILogger<SatPlatform.Services.MentorBot.MentorBotClient>>()));
+builder.Services.AddSingleton<SatPlatform.Services.MentorBot.MentorBotSender>();
+builder.Services.AddSingleton<SatPlatform.Services.MentorBot.MentorBotStatus>();
+builder.Services.AddSingleton<SatPlatform.Services.MentorBot.MentorBotAdmin>();
+builder.Services.AddHostedService<SatPlatform.Services.MentorBot.MentorBotService>();
+builder.Services.AddHostedService<SatPlatform.Services.MentorBot.MentorBotJobs>();
 builder.Services.AddHostedService<AttemptWatchdog>();
 builder.Services.AddHostedService<PracticeReminderJob>();
 builder.Services.AddHttpClient();
