@@ -238,8 +238,6 @@ public class MentorBotAdmin(
         var u = await db.Users.FindAsync(targetUserId);
         if (u is null) return "Foydalanuvchi topilmadi.";
         if (u.Role == UserRole.SuperAdmin && !actorIsSuperAdmin) return "Super admin sozlamalarini faqat super admin o'zgartiradi.";
-        if (u.Role is UserRole.Student or UserRole.Parent && role is not null && await db.Students.AnyAsync(s => s.UserId == u.Id && s.Enrollments.Any(e => e.Status == EnrollmentStatus.Active)))
-            return "Guruhda o'qiyotgan o'quvchiga xodim roli berib bo'lmaydi.";
         var old = u.BotRole;
         u.BotRole = role == u.Role ? null : role;
         await db.SaveChangesAsync();

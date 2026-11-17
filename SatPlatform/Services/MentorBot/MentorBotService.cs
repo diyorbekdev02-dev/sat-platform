@@ -55,17 +55,22 @@ public partial class MentorBotService(
 
     /// <summary>The user as the bot sees them: the bot role (if set) replaces the site role. Detached copy, never saved.</summary>
     internal static User BotView(User u) => u.BotRole is not UserRole r || r == u.Role ? u
-        : new User { Id = u.Id, FullName = u.FullName, Phone = u.Phone, Role = r, IsActive = u.IsActive, TelegramChatId = u.TelegramChatId, TelegramUsername = u.TelegramUsername, CanUseSite = u.CanUseSite };
+        : new User { Id = u.Id, FullName = u.FullName, Phone = u.Phone, Role = r, IsActive = u.IsActive, TelegramChatId = u.TelegramChatId, TelegramUsername = u.TelegramUsername, CanUseSite = u.CanUseSite, Student = u.Student };
 
     private static bool IsStaff(User? u) => u?.Role is UserRole.Admin or UserRole.SuperAdmin or UserRole.Teacher or UserRole.Assistant;
     private static bool IsAdmin(User? u) => u?.Role is UserRole.Admin or UserRole.SuperAdmin;
+
+    // a student who also got a staff role in the bot keeps the student buttons under the staff ones
+    private static readonly string[][] StudentRows = [[BtnSchedule, BtnHomework], [BtnResults, BtnQuiz], [BtnAsk, BtnPayment]];
+    private static readonly object StaffStudentMenu = Reply([[BtnGroups, BtnAttendance], [BtnNewHw, BtnSubmissions], [BtnBroadcast, BtnInbox], [BtnNewStudents, BtnDebtors], [BtnRisk, BtnReport], [BtnMaterials], .. StudentRows]);
+    private static readonly object TeacherStudentMenu = Reply([[BtnGroups, BtnAttendance], [BtnNewHw, BtnSubmissions], [BtnBroadcast, BtnInbox], [BtnRisk, BtnReport], [BtnMaterials], .. StudentRows]);
 
     private static object MenuFor(User u) => u.Role switch
     {
         UserRole.Student => StudentMenu,
         UserRole.Parent => ParentMenu,
-        UserRole.Admin or UserRole.SuperAdmin => StaffMenu,
-        _ => TeacherMenu
+        UserRole.Admin or UserRole.SuperAdmin => u.Student is null ? StaffMenu : StaffStudentMenu,
+        _ => u.Student is null ? TeacherMenu : TeacherStudentMenu
     };
 
     // ---------------------------------------------------------------- polling
@@ -221,7 +226,7 @@ public partial class MentorBotService(
         chat.LastSeenAt = DateTime.UtcNow; chat.IsBlocked = false;
         await db.SaveChangesAsync(ct);
 
-        var user = chat.UserId is int uid ? await db.Users.AsNoTracking().FirstOrDefaultAsync(x => x.Id == uid, ct) : null;
+        var user = chat.UserId is int uid ? await db.Users.AsNoTracking().Include(x => x.Student).FirstOrDefaultAsync(x => x.Id == uid, ct) : null;
         if (user is not null) user = BotView(user);
         if (user is not null && !user.IsActive) user = null;
         var c = new Ctx { U = u, Db = db, Chat = chat, User = user, Ct = ct };
@@ -309,7 +314,7 @@ public partial class MentorBotService(
                 case "/natija": await ChildrenAsync(c); return;
             }
         }
-        if (c.User.Role == UserRole.Student)
+        if (c.User.Role == UserRole.Student || (IsStaff(c.User) && c.User.Student is not null))
         {
             switch (cmd == "" ? t : t.StartsWith('/') ? cmd : t)
             {
@@ -429,7 +434,7 @@ public partial class MentorBotService(
         var phone = PhoneFormat.Normalize(c.U.ContactPhone);
         if (!PhoneFormat.IsValid(phone)) { await Say(c, "⚠️ Faqat O'zbekiston raqamlari (+998) qabul qilinadi.", ContactKeyboard); return; }
         c.Chat.Phone = phone;
-        var user = await c.Db.Users.FirstOrDefaultAsync(x => x.Phone == phone, c.Ct);
+        var user = await c.Db.Users.Include(x => x.Student).FirstOrDefaultAsync(x => x.Phone == phone, c.Ct);
         if (AdminPhones().Contains(phone)) user = await EnsureAdminAsync(c, phone, user);
         if (user is not null)
         {

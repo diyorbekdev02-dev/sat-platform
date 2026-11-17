@@ -302,9 +302,20 @@ public class MentorBotTests(EngineFixture f)
         Assert.Null(await admin.SetSiteAccessAsync(botOnly.Id, true, f.AdminId, true));
         Assert.NotNull((await auth.ConsumeLoginTokenAsync(await auth.IssueLoginTokenAsync(botOnly.Id))).User);
         Assert.NotNull(await admin.SetSiteAccessAsync(f.AdminId, false, f.AdminId, true));
-        // students in a group cannot become bot staff
+        // a student in a group can become a bot admin and keeps the student features
         var studentUser = await db.Users.FirstAsync(u => u.Phone == "+998902000003");
-        Assert.NotNull(await admin.SetBotRoleAsync(studentUser.Id, UserRole.Admin, f.AdminId, true));
+        Assert.Null(await admin.SetBotRoleAsync(studentUser.Id, UserRole.Admin, f.AdminId, true));
+        const long sChat = 700503;
+        await LinkAsync(sChat, "+998902000003");
+        var menu = Tg.Sent(sChat).Last(c => c.Body?["reply_markup"]?["keyboard"] is not null).Body!["reply_markup"]!["keyboard"]!.ToJsonString();
+        Assert.Contains("Qarzdorlar", menu);        // admin buttons
+        Assert.Contains("Vazifalar", menu);         // student buttons
+        await Text(sChat, "📊 Natijalarim");
+        Assert.Contains("natijalar", Tg.LastText(sChat));
+        await Text(sChat, "💰 Qarzdorlar");
+        Assert.Contains("Qarzdor", Tg.LastText(sChat));
+        await using (var db4 = await DbAsync()) Assert.Equal(UserRole.Student, (await db4.Users.FindAsync(studentUser.Id))!.Role); // site role unchanged
+        Assert.Null(await admin.SetBotRoleAsync(studentUser.Id, null, f.AdminId, true));
     }
 
     [Fact]
