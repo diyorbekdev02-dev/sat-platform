@@ -390,6 +390,31 @@ public partial class MentorBotService(
         (u.Role is UserRole.Admin or UserRole.SuperAdmin ? "🆕 Yangi o'quvchilar — guruhga qo'shish\n💰 Qarzdorlar — eslatma, to'lov kiritish\n" : "") +
         "⚠️ Xavf signallari — dars qoldirgan / vazifa topshirmaganlar\n📈 Hisobot — guruh statistikasi va CSV";
 
+    /// <summary>Phones from the MentorBot:AdminPhones server setting (comma separated) become admins when they share their contact.</summary>
+    private HashSet<string> AdminPhones() => (config["MentorBot:AdminPhones"] ?? "").Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries)
+        .Select(PhoneFormat.Normalize).Where(PhoneFormat.IsValid).ToHashSet();
+
+    private async Task<User> EnsureAdminAsync(Ctx c, string phone, User? user)
+    {
+        if (user is null)
+        {
+            user = new User { FullName = string.IsNullOrWhiteSpace(c.U.FirstName) ? "Admin" : c.U.FirstName.Trim(), Phone = phone, Role = UserRole.Admin,
+                AvatarColor = AuthService.ColorFor(phone), TelegramChatId = c.ChatId, TelegramUsername = c.U.Username };
+            c.Db.Users.Add(user);
+            await c.Db.SaveChangesAsync(c.Ct);
+            await audit.LogAsync(user.Id, "MentorBotAdminCreated", "User", user.Id, phone);
+        }
+        else if (user.Role is not (UserRole.Admin or UserRole.SuperAdmin) || !user.IsActive)
+        {
+            var old = user.Role;
+            if (user.Role is not (UserRole.Admin or UserRole.SuperAdmin)) user.Role = UserRole.Admin;
+            user.IsActive = true;
+            await c.Db.SaveChangesAsync(c.Ct);
+            await audit.LogAsync(user.Id, "MentorBotAdminPromoted", "User", user.Id, $"{old} -> {user.Role}");
+        }
+        return user;
+    }
+
     private async Task OnContactAsync(Ctx c)
     {
         if (c.U.ContactUserId is long cu && cu != c.U.FromId) { await Say(c, "Iltimos, o'zingizning raqamingizni yuboring.", ContactKeyboard); return; }
@@ -397,6 +422,7 @@ public partial class MentorBotService(
         if (!PhoneFormat.IsValid(phone)) { await Say(c, "⚠️ Faqat O'zbekiston raqamlari (+998) qabul qilinadi.", ContactKeyboard); return; }
         c.Chat.Phone = phone;
         var user = await c.Db.Users.FirstOrDefaultAsync(x => x.Phone == phone, c.Ct);
+        if (AdminPhones().Contains(phone)) user = await EnsureAdminAsync(c, phone, user);
         if (user is not null)
         {
             if (!user.IsActive) { await c.ResetAsync(); await Say(c, "⛔ Hisobingiz faol emas. Administratorga murojaat qiling.", RemoveKeyboard); return; }

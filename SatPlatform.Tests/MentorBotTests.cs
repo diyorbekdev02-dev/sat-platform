@@ -248,6 +248,23 @@ public class MentorBotTests(EngineFixture f)
     }
 
     [Fact]
+    public async Task Configured_admin_phone_becomes_admin_on_contact()
+    {
+        if (!f.Available) return;
+        Configure();
+        const long chat = 700401;
+        await LinkAsync(chat, "+998977009999");
+        await using var db = await DbAsync();
+        var user = await db.Users.FirstAsync(u => u.Phone == "+998977009999");
+        Assert.Equal(UserRole.Admin, user.Role);
+        Assert.Equal(user.Id, (await db.MentorBotChats.FindAsync(chat))!.UserId);
+        Assert.Contains("Mentor paneli", string.Join("\n", Tg.Sent(chat).Select(c => c.Body?["text"]?.GetValue<string>())));
+        // an ordinary unknown phone does not
+        await LinkAsync(700402, "+998977008888");
+        Assert.False(await db.Users.AnyAsync(u => u.Phone == "+998977008888"));
+    }
+
+    [Fact]
     public async Task Teacher_cannot_touch_other_groups_and_students_cannot_use_admin_actions()
     {
         if (!f.Available) return;

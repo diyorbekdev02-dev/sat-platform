@@ -26,7 +26,7 @@ public class EngineFixture : IAsyncLifetime
     public async Task InitializeAsync()
     {
         var cs = Environment.GetEnvironmentVariable("SAT_TEST_DB") ?? "Host=localhost;Port=5433;Database=satplatform_test;Username=postgres;Password=postgres";
-        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Seed:Demo"] = "true", ["Seed:AdminPassword"] = "Admin123!", ["Seed:DemoPassword"] = "Demo123!" }).Build();
+        var config = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { ["Seed:Demo"] = "true", ["Seed:AdminPassword"] = "Admin123!", ["Seed:DemoPassword"] = "Demo123!", ["MentorBot:AdminPhones"] = "+998977009999" }).Build();
         var sc = new ServiceCollection();
         sc.AddSingleton<IConfiguration>(config);
         sc.AddSingleton<IHostEnvironment>(new TestEnv());
