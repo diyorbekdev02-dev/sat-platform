@@ -4,7 +4,7 @@
             <NotAuthorized>
                 @if (context.User.Identity?.IsAuthenticated == true)
                 {
-                    <Pages.Forbidden />
+                    <SatPlatform.Components.Pages.Forbidden />
                 }
                 else
                 {

@@ -55,7 +55,6 @@ builder.Services.AddSingleton<PracticeService>();
 builder.Services.AddSingleton<AnalyticsService>();
 builder.Services.AddSingleton<AcademyService>();
 builder.Services.AddSingleton<CrmService>();
-builder.Services.AddSingleton<CrmService>();
 builder.Services.AddSingleton<HomeworkService>();
 builder.Services.AddSingleton<MaterialService>();
 builder.Services.AddSingleton<NotificationService>();
@@ -133,7 +132,22 @@ app.MapGet("/files/{id:int}", async (int id, MediaService media, HttpContext htt
     if (http.User.Identity?.IsAuthenticated != true) return Results.Unauthorized();
     await using var db = await factory.CreateDbContextAsync();
     var file = await db.MediaFiles.AsNoTracking().FirstOrDefaultAsync(f => f.Id == id);
-    return file is null ? Results.NotFound() : Results.File(file.Data, file.ContentType, file.OriginalName);
+    if (file is null) return Results.NotFound();
+    // Homework submissions are private: only staff, the submitting student and their linked parents may open them.
+    var role = http.User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+    if (role is not ("Admin" or "SuperAdmin" or "Teacher" or "Assistant"))
+    {
+        var owners = await db.HomeworkSubmissions.AsNoTracking().Where(s => s.FileId == id).Select(s => s.StudentId).ToListAsync();
+        if (owners.Count > 0)
+        {
+            var userId = int.Parse(http.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)!.Value);
+            var allowed = await db.Students.AnyAsync(st => owners.Contains(st.Id) && st.UserId == userId)
+                || await db.ParentStudents.AnyAsync(ps => owners.Contains(ps.StudentId) && ps.ParentUserId == userId);
+            if (!allowed) return Results.NotFound();
+        }
+    }
+    http.Response.Headers.CacheControl = "private,no-store";
+    return Results.File(file.Data, file.ContentType, file.OriginalName);
 });
 
 // ---- image upload from the rich editor (staff only)
